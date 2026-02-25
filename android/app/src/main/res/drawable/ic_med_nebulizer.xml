@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Bubbles icon for nebulizer - blue bubbles -->
+    <path
+        android:fillColor="#42a5f5"
+        android:pathData="M7,10m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0"/>
+    <path
+        android:fillColor="#90caf9"
+        android:pathData="M16,8m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+    <path
+        android:fillColor="#bbdefb"
+        android:pathData="M15,17m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0"/>
+</vector>

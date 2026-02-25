@@ -17,7 +17,7 @@ export function IntroductionSection() {
 
       {/* Healthy Food Section */}
       <View style={styles.foodSection}>
-        <Text style={styles.sectionTitle}>Healthy food for COPD patients</Text>
+        <Text style={styles.foodSectionTitle}>Healthy food for COPD patients</Text>
       </View>
 
       {/* Understanding COPD Section */}
@@ -80,7 +80,7 @@ export function IntroductionSection() {
       {/* Footer Section */}
       <View style={styles.footerSection}>
         <View style={styles.footerHeader}>
-          <Text style={styles.footerTitle}>COPD Diet 4 U</Text>
+          <Text style={styles.footerTitle}>COPD Fuel</Text>
           <Text style={styles.footerSubtitle}>
             Helping you breathe easier with personalized nutritional guidance tailored for COPD management.
           </Text>
@@ -111,7 +111,7 @@ export function IntroductionSection() {
 
         <View style={styles.copyright}>
           <Text style={styles.copyrightText}>
-            © 2023 COPD Diet 4 U. All rights reserved. The information provided is not medical
+            © 2024 COPD Fuel. All rights reserved. The information provided is not medical
           </Text>
         </View>
       </View>
@@ -161,6 +161,13 @@ const styles = StyleSheet.create({
     paddingVertical: 32,
     paddingHorizontal: 20,
     backgroundColor: '#f8fafc',
+  },
+  foodSectionTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1f2937',
+    textAlign: 'center',
+    width: '100%',
   },
   sectionTitle: {
     fontSize: 24,

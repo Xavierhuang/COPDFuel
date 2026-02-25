@@ -6,7 +6,7 @@ export function Footer() {
     <View style={styles.container}>
       <View style={styles.content}>
         <View style={styles.mainSection}>
-          <Text style={styles.title}>COPD Diet 4 U</Text>
+          <Text style={styles.title}>COPD Fuel</Text>
           <Text style={styles.description}>
             Helping you breathe easier with personalized nutritional guidance
             tailored for COPD management.
@@ -45,7 +45,7 @@ export function Footer() {
       <View style={styles.divider} />
       <View style={styles.copyright}>
         <Text style={styles.copyrightText}>
-          &copy; 2024 COPD Diet 4 U. All rights reserved. The information
+          &copy; 2024 COPD Fuel. All rights reserved. The information
           provided is not medical advice.
         </Text>
       </View>

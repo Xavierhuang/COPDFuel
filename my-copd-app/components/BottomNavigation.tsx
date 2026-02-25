@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Home, BookOpen, PieChart, HeartPulse, User, Box } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 type BottomNavigationProps = {
   activeTab: string;
@@ -15,32 +15,32 @@ export function BottomNavigation({
     {
       id: 'home',
       label: 'Home',
-      icon: Home
+      icon: 'home'
     },
     {
       id: 'guidelines',
       label: 'Guidelines',
-      icon: BookOpen
+      icon: 'book'
     },
     {
       id: 'tracking',
       label: 'Tracking',
-      icon: PieChart
+      icon: 'pie-chart'
     },
     {
       id: 'recipes',
       label: 'Recipes',
-      icon: HeartPulse
+      icon: 'heart'
     },
     {
       id: 'copd-tools',
       label: 'Resources',
-      icon: Box
+      icon: 'cube'
     },
     {
       id: 'profile',
       label: 'Profile',
-      icon: User
+      icon: 'person'
     }
   ];
 
@@ -48,18 +48,18 @@ export function BottomNavigation({
     <View style={styles.container}>
       <View style={styles.tabsContainer}>
         {tabs.map(tab => {
-          const Icon = tab.icon;
           const isActive = activeTab === tab.id;
-          
+
           return (
             <TouchableOpacity
               key={tab.id}
               style={styles.tab}
               onPress={() => setActiveTab(tab.id)}
             >
-              <Icon 
-                size={24} 
-                color={isActive ? '#2563eb' : '#6b7280'} 
+              <Ionicons
+                name={tab.icon as any}
+                size={24}
+                color={isActive ? '#2563eb' : '#6b7280'}
               />
               <Text style={[
                 styles.tabLabel,

@@ -1,4 +1,48 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
-</resources> 
+    <color name="splashscreen_background">#ffffff</color>
+    <color name="iconBackground">#ffffff</color>
+    <color name="colorPrimary">#2563eb</color>
+    <color name="colorPrimaryDark">#1e40af</color>
+    <color name="colorSecondary">#2dd4bf</color>
+    
+    <!-- Text Colors -->
+    <color name="textPrimary">#1f2937</color>
+    <color name="textSecondary">#4b5563</color>
+    <color name="textTertiary">#6b7280</color>
+    <color name="textWhite">#ffffff</color>
+    
+    <!-- Background Colors -->
+    <color name="backgroundWhite">#ffffff</color>
+    <color name="backgroundGray">#f8fafc</color>
+    <color name="backgroundBlue">#eff6ff</color>
+    <color name="backgroundDark">#1f2937</color>
+    
+    <!-- Border Colors -->
+    <color name="borderGray">#e5e7eb</color>
+    <color name="borderLightGray">#e2e8f0</color>
+    
+    <!-- Card Colors -->
+    <color name="cardBackground">#ffffff</color>
+    <color name="cardBackgroundBlue">#eff6ff</color>
+    
+    <!-- Button Colors -->
+    <color name="buttonBlue">#2563eb</color>
+    <color name="buttonBlueDark">#1d4ed8</color>
+    
+    <!-- Additional Colors -->
+    <color name="lightGreen">#dcfce7</color>
+    <color name="lightYellow">#fef3c7</color>
+    <color name="colorOrange">#f97316</color>
+    <color name="brownText">#92400e</color>
+    <color name="lightBlue">#eff6ff</color>
+    
+    <!-- Status Colors -->
+    <color name="colorSuccess">#10b981</color>
+    <color name="colorError">#dc2626</color>
+    <color name="colorWarning">#f59e0b</color>
+    <color name="colorAccent">#f59e0b</color>
+    
+    <!-- Specialty Tag Colors -->
+    <color name="specialtyBackground">#dbeafe</color>
+    <color name="specialtyText">#1e40af</color>
+</resources>

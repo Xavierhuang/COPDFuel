@@ -1,0 +1,1162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@color/backgroundWhite">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Profile Header -->
+        <LinearLayout
+            android:id="@+id/profile_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:background="@color/backgroundWhite"
+            android:paddingBottom="16dp">
+
+            <TextView
+                android:id="@+id/profile_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="My Profile"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:textColor="@color/textPrimary"
+                android:gravity="center" />
+
+        </LinearLayout>
+
+        <!-- Profile Section -->
+        <LinearLayout
+            android:id="@+id/profile_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:background="@color/backgroundWhite">
+
+            <!-- Age -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/profile_age_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground"
+                android:layout_marginBottom="1dp">
+
+                <TextView
+                    android:id="@+id/profile_age_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Age"
+                    android:textSize="16sp"
+                    android:textColor="@color/textPrimary"
+                    android:textStyle="bold"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_age_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="N/A"
+                    android:textSize="16sp"
+                    android:textColor="@color/textSecondary"
+                    app:layout_constraintEnd_toStartOf="@+id/profile_age_arrow"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_age_arrow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=">"
+                    android:textSize="16sp"
+                    android:textColor="@color/textTertiary"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/borderGray"
+                android:layout_marginStart="20dp" />
+
+            <!-- Sex -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/profile_sex_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground"
+                android:layout_marginBottom="1dp">
+
+                <TextView
+                    android:id="@+id/profile_sex_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Sex"
+                    android:textSize="16sp"
+                    android:textColor="@color/textPrimary"
+                    android:textStyle="bold"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_sex_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="N/A"
+                    android:textSize="16sp"
+                    android:textColor="@color/textSecondary"
+                    app:layout_constraintEnd_toStartOf="@+id/profile_sex_arrow"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_sex_arrow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=">"
+                    android:textSize="16sp"
+                    android:textColor="@color/textTertiary"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/borderGray"
+                android:layout_marginStart="20dp" />
+
+            <!-- Weight -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/profile_weight_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground"
+                android:layout_marginBottom="1dp">
+
+                <TextView
+                    android:id="@+id/profile_weight_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Weight"
+                    android:textSize="16sp"
+                    android:textColor="@color/textPrimary"
+                    android:textStyle="bold"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_weight_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="N/A"
+                    android:textSize="16sp"
+                    android:textColor="@color/textSecondary"
+                    app:layout_constraintEnd_toStartOf="@+id/profile_weight_arrow"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_weight_arrow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=">"
+                    android:textSize="16sp"
+                    android:textColor="@color/textTertiary"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/borderGray"
+                android:layout_marginStart="20dp" />
+
+            <!-- Height -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/profile_height_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground"
+                android:layout_marginBottom="1dp">
+
+                <TextView
+                    android:id="@+id/profile_height_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Height"
+                    android:textSize="16sp"
+                    android:textColor="@color/textPrimary"
+                    android:textStyle="bold"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_height_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="N/A"
+                    android:textSize="16sp"
+                    android:textColor="@color/textSecondary"
+                    app:layout_constraintEnd_toStartOf="@+id/profile_height_arrow"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_height_arrow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=">"
+                    android:textSize="16sp"
+                    android:textColor="@color/textTertiary"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/borderGray"
+                android:layout_marginStart="20dp" />
+
+            <!-- BMI (read-only) -->
+            <LinearLayout
+                android:id="@+id/profile_bmi_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingVertical="16dp"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="1dp">
+
+                <TextView
+                    android:id="@+id/profile_bmi_label"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Body Mass Index (BMI)"
+                    android:textSize="16sp"
+                    android:textColor="@color/textPrimary"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/profile_bmi_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="N/A"
+                    android:textSize="16sp"
+                    android:textColor="@color/textSecondary" />
+
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/borderGray"
+                android:layout_marginStart="20dp" />
+
+            <!-- Last Updated -->
+            <LinearLayout
+                android:id="@+id/profile_last_updated_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingVertical="16dp"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="1dp">
+
+                <TextView
+                    android:id="@+id/profile_last_updated_label"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Last Updated"
+                    android:textSize="16sp"
+                    android:textColor="@color/textPrimary"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/profile_last_updated_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="N/A"
+                    android:textSize="16sp"
+                    android:textColor="@color/textSecondary" />
+
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/borderGray"
+                android:layout_marginStart="20dp" />
+
+        </LinearLayout>
+
+        <!-- Activity Level Section -->
+        <LinearLayout
+            android:id="@+id/activity_level_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:background="@color/backgroundGray"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Activity Level"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/textPrimary"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Which option best describes your current activity level?"
+                android:textSize="14sp"
+                android:textColor="@color/textSecondary"
+                android:layout_marginBottom="12dp" />
+
+            <RadioGroup
+                android:id="@+id/activity_level_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/radio_low_activity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Low activity (limited movement or mostly sedentary)"
+                    android:textSize="14sp"
+                    android:textColor="@color/textPrimary"
+                    android:paddingVertical="4dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="1.0-1.2 g protein per kg body weight/day"
+                    android:textSize="12sp"
+                    android:textColor="@color/textSecondary"
+                    android:paddingStart="32dp"
+                    android:layout_marginBottom="8dp" />
+
+                <RadioButton
+                    android:id="@+id/radio_moderate_activity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Moderate activity (regular daily activities with some exercise)"
+                    android:textSize="14sp"
+                    android:textColor="@color/textPrimary"
+                    android:paddingVertical="4dp" />
+
+                <RadioButton
+                    android:id="@+id/radio_pulmonary_rehab"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Participating in pulmonary rehabilitation"
+                    android:textSize="14sp"
+                    android:textColor="@color/textPrimary"
+                    android:paddingVertical="4dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="1.2-1.4 g protein per kg body weight/day"
+                    android:textSize="12sp"
+                    android:textColor="@color/textSecondary"
+                    android:paddingStart="32dp"
+                    android:layout_marginBottom="8dp" />
+
+                <RadioButton
+                    android:id="@+id/radio_high_activity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="High activity (active lifestyle or regular exercise)"
+                    android:textSize="14sp"
+                    android:textColor="@color/textPrimary"
+                    android:paddingVertical="4dp" />
+
+                <RadioButton
+                    android:id="@+id/radio_exacerbation"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Currently experiencing a COPD exacerbation or flare up"
+                    android:textSize="14sp"
+                    android:textColor="@color/textPrimary"
+                    android:paddingVertical="4dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="1.6-1.8 g protein per kg body weight/day"
+                    android:textSize="12sp"
+                    android:textColor="@color/textSecondary"
+                    android:paddingStart="32dp"
+                    android:layout_marginBottom="8dp" />
+
+                <RadioButton
+                    android:id="@+id/radio_kidney_disease"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Kidney disease (including chronic kidney disease Stage 2)"
+                    android:textSize="14sp"
+                    android:textColor="@color/textPrimary"
+                    android:paddingVertical="4dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="1.0-1.2 g protein per kg body weight/day"
+                    android:textSize="12sp"
+                    android:textColor="@color/textSecondary"
+                    android:paddingStart="32dp"
+                    android:layout_marginBottom="8dp" />
+
+                <RadioButton
+                    android:id="@+id/radio_dialysis"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Currently on dialysis"
+                    android:textSize="14sp"
+                    android:textColor="@color/textPrimary"
+                    android:paddingVertical="4dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="1.2-1.8 g protein per kg body weight/day"
+                    android:textSize="12sp"
+                    android:textColor="@color/textSecondary"
+                    android:paddingStart="32dp"
+                    android:layout_marginBottom="8dp" />
+
+            </RadioGroup>
+
+            <!-- Calculated protein target display -->
+            <LinearLayout
+                android:id="@+id/protein_target_display"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@color/backgroundWhite"
+                android:padding="12dp"
+                android:layout_marginTop="12dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Your Daily Protein Target"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/colorSuccess" />
+
+                <TextView
+                    android:id="@+id/protein_target_value"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="-- g/day (set weight and activity level)"
+                    android:textSize="16sp"
+                    android:textColor="@color/textPrimary"
+                    android:layout_marginTop="4dp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Health Conditions Section -->
+        <LinearLayout
+            android:id="@+id/health_conditions_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:background="@color/backgroundGray"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Health Conditions with COPD"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/textPrimary"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Please check all that apply (affects protein target):"
+                android:textSize="14sp"
+                android:textColor="@color/textSecondary"
+                android:layout_marginBottom="16dp" />
+
+            <CheckBox
+                android:id="@+id/checkbox_kidney_disease"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Kidney disease (including chronic kidney disease Stage 2)"
+                android:textSize="14sp"
+                android:textColor="@color/textPrimary"
+                android:minHeight="0dp"
+                android:paddingVertical="2dp" />
+
+            <CheckBox
+                android:id="@+id/checkbox_high_cholesterol"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="High cholesterol"
+                android:textSize="14sp"
+                android:textColor="@color/textPrimary"
+                android:minHeight="0dp"
+                android:paddingVertical="2dp" />
+
+            <CheckBox
+                android:id="@+id/checkbox_pulmonary_hypertension"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Pulmonary hypertension"
+                android:textSize="14sp"
+                android:textColor="@color/textPrimary"
+                android:minHeight="0dp"
+                android:paddingVertical="2dp" />
+
+            <CheckBox
+                android:id="@+id/checkbox_dialysis"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Currently on dialysis"
+                android:textSize="14sp"
+                android:textColor="@color/textPrimary"
+                android:minHeight="0dp"
+                android:paddingVertical="2dp" />
+
+            <CheckBox
+                android:id="@+id/checkbox_none"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="None of the above"
+                android:textSize="14sp"
+                android:textColor="@color/textPrimary"
+                android:minHeight="0dp"
+                android:paddingVertical="2dp" />
+
+            <CheckBox
+                android:id="@+id/checkbox_other"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Other (please specify)"
+                android:textSize="14sp"
+                android:textColor="@color/textPrimary"
+                android:minHeight="0dp"
+                android:paddingVertical="2dp" />
+
+            <EditText
+                android:id="@+id/edit_other_condition"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Please specify other conditions"
+                android:textSize="14sp"
+                android:inputType="textMultiLine"
+                android:minLines="2"
+                android:maxLines="4"
+                android:gravity="top"
+                android:background="@color/backgroundWhite"
+                android:padding="12dp"
+                android:visibility="gone"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Supplemental Oxygen Question -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Do you use supplemental oxygen?"
+                android:textSize="14sp"
+                android:textColor="@color/textPrimary"
+                android:layout_marginBottom="8dp" />
+
+            <RadioGroup
+                android:id="@+id/radio_oxygen"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <RadioButton
+                    android:id="@+id/radio_oxygen_yes"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Yes"
+                    android:textSize="14sp"
+                    android:layout_marginEnd="24dp" />
+
+                <RadioButton
+                    android:id="@+id/radio_oxygen_no"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="No"
+                    android:textSize="14sp" />
+
+            </RadioGroup>
+
+            <LinearLayout
+                android:id="@+id/lpm_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="What is your LPM?"
+                    android:textSize="14sp"
+                    android:textColor="@color/textPrimary"
+                    android:layout_marginBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/edit_lpm"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Enter LPM"
+                    android:textSize="14sp"
+                    android:inputType="numberDecimal"
+                    android:background="@color/backgroundWhite"
+                    android:padding="12dp" />
+
+            </LinearLayout>
+
+            <!-- BIPAP Question -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Are you on a BIPAP or NIV?"
+                android:textSize="14sp"
+                android:textColor="@color/textPrimary"
+                android:layout_marginBottom="8dp" />
+
+            <RadioGroup
+                android:id="@+id/radio_bipap"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <RadioButton
+                    android:id="@+id/radio_bipap_yes"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Yes"
+                    android:textSize="14sp"
+                    android:layout_marginEnd="24dp" />
+
+                <RadioButton
+                    android:id="@+id/radio_bipap_no"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="No"
+                    android:textSize="14sp" />
+
+            </RadioGroup>
+
+            <LinearLayout
+                android:id="@+id/bipap_details_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- Which machine -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Which machine?"
+                    android:textSize="14sp"
+                    android:textColor="@color/textPrimary"
+                    android:layout_marginBottom="8dp" />
+
+                <RadioGroup
+                    android:id="@+id/radio_machine_type"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="12dp">
+
+                    <RadioButton
+                        android:id="@+id/radio_machine_bipap"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="BIPAP"
+                        android:textSize="14sp"
+                        android:layout_marginEnd="24dp" />
+
+                    <RadioButton
+                        android:id="@+id/radio_machine_niv"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="NIV"
+                        android:textSize="14sp" />
+
+                </RadioGroup>
+
+                <!-- Setting question -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="What is your setting?"
+                    android:textSize="14sp"
+                    android:textColor="@color/textPrimary"
+                    android:layout_marginBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/edit_bipap_setting"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Enter setting"
+                    android:textSize="14sp"
+                    android:inputType="text"
+                    android:background="@color/backgroundWhite"
+                    android:padding="12dp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Privacy Policy -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/profile_privacy_item"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="20dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <TextView
+                android:id="@+id/profile_privacy_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Privacy Policy"
+                android:textSize="16sp"
+                android:textColor="@color/textPrimary"
+                android:textStyle="bold"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+
+            <TextView
+                android:id="@+id/profile_privacy_arrow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=">"
+                android:textSize="16sp"
+                android:textColor="@color/textTertiary"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- HIPAA Authorization -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/profile_hipaa_item"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="20dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <TextView
+                android:id="@+id/profile_hipaa_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="HIPAA Authorization (PHI Disclosure)"
+                android:textSize="16sp"
+                android:textColor="@color/textPrimary"
+                android:textStyle="bold"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+
+            <TextView
+                android:id="@+id/profile_hipaa_arrow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=">"
+                android:textSize="16sp"
+                android:textColor="@color/textTertiary"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+
+            <TextView
+                android:id="@+id/profile_hipaa_value"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:text="Not signed"
+                android:textSize="14sp"
+                android:textColor="@color/textSecondary"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                app:layout_constraintStart_toEndOf="@id/profile_hipaa_label"
+                app:layout_constraintEnd_toStartOf="@id/profile_hipaa_arrow"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- Share Health Report Section -->
+        <LinearLayout
+            android:id="@+id/share_report_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:background="@color/backgroundWhite"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Share Health Report"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/textPrimary"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Share a comprehensive report of your health data including tracking information, severity assessment, and exacerbation plan with your healthcare provider or caregiver."
+                android:textSize="14sp"
+                android:textColor="@color/textSecondary"
+                android:layout_marginBottom="16dp" />
+
+            <Button
+                android:id="@+id/btn_share_report"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Share My Health Report"
+                android:textColor="@android:color/white"
+                android:background="@color/colorPrimary"
+                android:drawableStart="@drawable/ic_share"
+                android:drawableTint="@android:color/white"
+                android:drawablePadding="8dp"
+                android:paddingVertical="12dp" />
+
+        </LinearLayout>
+
+        <!-- Link to Doctor Section -->
+        <LinearLayout
+            android:id="@+id/link_doctor_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:background="@color/backgroundWhite"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Share with your doctor"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/textPrimary"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Share your health data with your doctor or practice."
+                android:textSize="14sp"
+                android:textColor="@color/textSecondary"
+                android:layout_marginBottom="12dp" />
+
+            <CheckBox
+                android:id="@+id/link_doctor_consent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="I agree to share my health data with this practice."
+                android:textSize="14sp"
+                android:layout_marginBottom="12dp" />
+
+            <Button
+                android:id="@+id/btn_link_doctor"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Link to doctor"
+                android:textColor="@android:color/white"
+                android:background="@color/colorPrimary"
+                android:paddingVertical="12dp" />
+        </LinearLayout>
+
+        <!-- Doctor Info Section -->
+        <LinearLayout
+            android:id="@+id/doctor_info_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:background="@color/backgroundWhite"
+            android:layout_marginTop="8dp">
+
+            <!-- Doctor Name -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/profile_doctor_name_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground"
+                android:layout_marginBottom="1dp">
+
+                <TextView
+                    android:id="@+id/profile_doctor_name_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Doctor Name"
+                    android:textSize="16sp"
+                    android:textColor="@color/textPrimary"
+                    android:textStyle="bold"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_doctor_name_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="N/A"
+                    android:textSize="16sp"
+                    android:textColor="@color/textSecondary"
+                    app:layout_constraintEnd_toStartOf="@+id/profile_doctor_name_arrow"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_doctor_name_arrow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=">"
+                    android:textSize="16sp"
+                    android:textColor="@color/textTertiary"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/borderGray"
+                android:layout_marginStart="20dp" />
+
+            <!-- Doctor Phone -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/profile_doctor_phone_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground">
+
+                <TextView
+                    android:id="@+id/profile_doctor_phone_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Doctor Phone"
+                    android:textSize="16sp"
+                    android:textColor="@color/textPrimary"
+                    android:textStyle="bold"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_doctor_phone_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="N/A"
+                    android:textSize="16sp"
+                    android:textColor="@color/textSecondary"
+                    app:layout_constraintEnd_toStartOf="@+id/profile_doctor_phone_arrow"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_doctor_phone_arrow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=">"
+                    android:textSize="16sp"
+                    android:textColor="@color/textTertiary"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/borderGray"
+                android:layout_marginStart="20dp" />
+
+            <!-- Emergency Contact Name -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/profile_emergency_name_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground"
+                android:layout_marginBottom="1dp">
+
+                <TextView
+                    android:id="@+id/profile_emergency_name_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Emergency Contact Name"
+                    android:textSize="16sp"
+                    android:textColor="@color/textPrimary"
+                    android:textStyle="bold"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_emergency_name_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="N/A"
+                    android:textSize="16sp"
+                    android:textColor="@color/textSecondary"
+                    app:layout_constraintEnd_toStartOf="@+id/profile_emergency_name_arrow"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_emergency_name_arrow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=">"
+                    android:textSize="16sp"
+                    android:textColor="@color/textTertiary"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/borderGray"
+                android:layout_marginStart="20dp" />
+
+            <!-- Emergency Contact Phone -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/profile_emergency_phone_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground">
+
+                <TextView
+                    android:id="@+id/profile_emergency_phone_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Emergency Contact Phone"
+                    android:textSize="16sp"
+                    android:textColor="@color/textPrimary"
+                    android:textStyle="bold"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_emergency_phone_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="N/A"
+                    android:textSize="16sp"
+                    android:textColor="@color/textSecondary"
+                    app:layout_constraintEnd_toStartOf="@+id/profile_emergency_phone_arrow"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/profile_emergency_phone_arrow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=">"
+                    android:textSize="16sp"
+                    android:textColor="@color/textTertiary"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </LinearLayout>
+
+        <!-- Sign out -->
+        <Button
+            android:id="@+id/btn_sign_out"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="20dp"
+            android:text="Sign out"
+            android:backgroundTint="@color/textSecondary" />
+
+    </LinearLayout>
+
+</ScrollView>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Frying pan with egg icon -->
+    <path
+        android:fillColor="#22c55e"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M17.5,11c0,2.49 -2.01,4.5 -4.5,4.5S8.5,13.49 8.5,11s2.01,-4.5 4.5,-4.5 4.5,2.01 4.5,4.5z"/>
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M14.5,11c0,1.1 -0.9,2 -2,2s-2,-0.9 -2,-2 0.9,-2 2,-2 2,0.9 2,2z"/>
+    <path
+        android:fillColor="#22c55e"
+        android:pathData="M18,10h3v2h-3z"/>
+</vector>

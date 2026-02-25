@@ -1,0 +1,25 @@
+# Root .gitignore for COPD project
+
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+build/
+.expo/
+
+# Temporary files
+*.tmp
+*.temp
+temp-*/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+

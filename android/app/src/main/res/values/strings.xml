@@ -1,3 +1,20 @@
 <resources>
-    <string name="app_name">COPD Health Tracker</string>
-</resources> 
+  <string name="app_name">COPD Fuel</string>
+  <string name="signup_subtitle_create">Use your email and a password to sign up.</string>
+  <string name="signup_subtitle_confirm">We sent a verification code to %1$s. Enter it below.</string>
+  <string name="signup_button_sign_up">Sign up</string>
+  <string name="signup_button_confirm">Confirm</string>
+  <string name="hipaa_title">HIPAA Authorization for PHI Disclosure</string>
+  <string name="hipaa_i_agree">I have read and agree to the disclosure of my PHI as described in this Authorization.</string>
+  <string name="hipaa_printed_name_hint">Printed name</string>
+  <string name="hipaa_submit">Submit authorization</string>
+  <string name="hipaa_status_signed">Signed on %1$s</string>
+  <string name="hipaa_status_revoked">Revoked on %1$s</string>
+  <string name="hipaa_status_not_signed">Not signed</string>
+  <string name="hipaa_revoke">Revoke authorization</string>
+  <string name="hipaa_revoke_confirm">Revoke your HIPAA authorization? You can sign again later if needed.</string>
+  <string name="hipaa_consent_required">You must complete the HIPAA Authorization before linking to a doctor.</string>
+  <string name="expo_system_ui_user_interface_style" translatable="false">automatic</string>
+  <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
+  <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
+</resources>

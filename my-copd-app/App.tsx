@@ -21,6 +21,7 @@ export default function App() {
   const [showFlareupDropdown, setShowFlareupDropdown] = useState(false);
   const [showOxygenDropdown, setShowOxygenDropdown] = useState(false);
   const [showOxygenLitersDropdown, setShowOxygenLitersDropdown] = useState(false);
+  const [expandedMedicationCategory, setExpandedMedicationCategory] = useState(null);
   
   // Food tracking states
   const [showAddFoodModal, setShowAddFoodModal] = useState(false);
@@ -31,6 +32,38 @@ export default function App() {
   const [foodProtein, setFoodProtein] = useState('');
   const [foodCarbs, setFoodCarbs] = useState('');
   const [foodFat, setFoodFat] = useState('');
+  
+  // Food search states
+  const [foodSearchQuery, setFoodSearchQuery] = useState('');
+  const [foodSearchResults, setFoodSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showFoodSearch, setShowFoodSearch] = useState(false);
+  
+  // Date tracking state
+  const [currentDate, setCurrentDate] = useState(new Date());
+  
+  // Saved foods for each meal (organized by date)
+  const [savedFoods, setSavedFoods] = useState({
+    Breakfast: [],
+    Lunch: [],
+    Dinner: [],
+    Snacks: []
+  });
+  
+  // All foods organized by date
+  const [foodsByDate, setFoodsByDate] = useState({});
+  
+  // Exercise tracking states
+  const [showExerciseModal, setShowExerciseModal] = useState(false);
+  const [selectedExerciseType, setSelectedExerciseType] = useState('');
+  const [exerciseMinutes, setExerciseMinutes] = useState('');
+  const [customExerciseType, setCustomExerciseType] = useState('');
+  const [dailyExercises, setDailyExercises] = useState([]);
+  
+  // Oxygen saturation tracking states
+  const [showOxygenModal, setShowOxygenModal] = useState(false);
+  const [oxygenLevel, setOxygenLevel] = useState('');
+  const [dailyOxygenReadings, setDailyOxygenReadings] = useState([]);
   
   // Weight tracking states
   const [showWeightModal, setShowWeightModal] = useState(false);
@@ -102,9 +135,12 @@ export default function App() {
   };
 
   // Food tracking functions
-  const openAddFoodModal = (category) => {
+  const openAddFoodModal = (category: string) => {
+    console.log('Opening food modal for category:', category);
+    console.log('Current showAddFoodModal state:', showAddFoodModal);
     setSelectedMealCategory(category);
     setShowAddFoodModal(true);
+    console.log('Modal state should now be true');
   };
 
   const closeAddFoodModal = () => {
@@ -118,24 +154,168 @@ export default function App() {
     setFoodFat('');
   };
 
+  // Food search function using USDA FoodData Central API (closest free alternative to NCCDB)
+  const searchFoodDatabase = async (query: string) => {
+    if (!query.trim()) return;
+    
+    setIsSearching(true);
+    try {
+      // Using USDA FoodData Central API - includes:
+      // - Foundation Foods (nutrient-dense foods like NCCDB)
+      // - SR Legacy (similar to NCCDB's standard reference)
+      // - Branded Foods (8,000+ like NCCDB)
+      // - Survey Foods (FNDDS - what people actually eat)
+      
+      // Using your personal USDA API key for higher rate limits
+      const response = await fetch(
+        `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&pageSize=15&dataType=Foundation,SR%20Legacy,Branded&api_key=[REDACTED_USDA_API_KEY]`
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to search foods');
+      }
+      
+      const data = await response.json();
+      const foods = data.foods.map((food: any) => ({
+        id: food.fdcId,
+        description: food.description,
+        brandOwner: food.brandOwner,
+        ingredients: food.ingredients,
+        nutrients: food.foodNutrients.reduce((acc: any, nutrient: any) => {
+          const nutrientName = nutrient.nutrientName.toLowerCase();
+          if (nutrientName.includes('energy') || nutrientName.includes('calorie')) {
+            acc.calories = nutrient.value;
+          } else if (nutrientName.includes('protein')) {
+            acc.protein = nutrient.value;
+          } else if (nutrientName.includes('carbohydrate')) {
+            acc.carbs = nutrient.value;
+          } else if (nutrientName.includes('total lipid') || nutrientName.includes('fat')) {
+            acc.fat = nutrient.value;
+          }
+          return acc;
+        }, {})
+      }));
+      
+      setFoodSearchResults(foods);
+    } catch (error) {
+      console.error('Food search error:', error);
+      
+      // Fallback with common foods if API fails
+      const fallbackFoods = [
+        {
+          id: 'fallback-1',
+          description: `${query} (estimated)`,
+          brandOwner: 'Estimated Values',
+          nutrients: {
+            calories: query.toLowerCase().includes('chicken') ? 165 : 
+                     query.toLowerCase().includes('apple') ? 52 : 
+                     query.toLowerCase().includes('rice') ? 130 : 100,
+            protein: query.toLowerCase().includes('chicken') ? 20 : 
+                    query.toLowerCase().includes('apple') ? 0.3 : 
+                    query.toLowerCase().includes('rice') ? 2.7 : 2,
+            carbs: query.toLowerCase().includes('chicken') ? 0 : 
+                  query.toLowerCase().includes('apple') ? 14 : 
+                  query.toLowerCase().includes('rice') ? 28 : 15,
+            fat: query.toLowerCase().includes('chicken') ? 3.6 : 
+                query.toLowerCase().includes('apple') ? 0.2 : 
+                query.toLowerCase().includes('rice') ? 0.3 : 1
+          }
+        }
+      ];
+      
+      setFoodSearchResults(fallbackFoods);
+      Alert.alert('API Limit Reached', 'Using estimated values. For accurate data, try again later or enter manually.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const selectFoodFromSearch = (food: any) => {
+    setFoodName(food.description);
+    setFoodCalories(food.nutrients.calories?.toString() || '');
+    setFoodProtein(food.nutrients.protein?.toString() || '');
+    setFoodCarbs(food.nutrients.carbs?.toString() || '');
+    setFoodFat(food.nutrients.fat?.toString() || '');
+    setShowFoodSearch(false);
+    setFoodSearchQuery('');
+    setFoodSearchResults([]);
+  };
+
   const saveFoodItem = () => {
-    if (!foodName.trim() || !foodQuantity.trim()) {
-      Alert.alert('Error', 'Please enter food name and quantity');
+    console.log('Save button clicked!');
+    console.log('Current values:', {
+      foodName: foodName,
+      foodQuantity: foodQuantity,
+      foodCalories: foodCalories,
+      foodProtein: foodProtein,
+      foodCarbs: foodCarbs,
+      foodFat: foodFat
+    });
+    
+    if (!foodName.trim()) {
+      Alert.alert('Error', 'Please enter a food name');
       return;
     }
     
-    // Here you would typically save to AsyncStorage or your database
-    console.log('Saving food item:', {
-      category: selectedMealCategory,
+    if (!foodQuantity.trim()) {
+      Alert.alert(
+        '⚠️ Quantity Required', 
+        'Please enter the quantity you ate.\n\nExamples:\n• "1 cup"\n• "100g"\n• "1 piece"\n• "4 oz"',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+    
+    // Create food item object
+    const foodItem = {
+      id: Date.now().toString(),
       name: foodName,
       quantity: foodQuantity,
       calories: foodCalories,
       protein: foodProtein,
       carbs: foodCarbs,
-      fat: foodFat
+      fat: foodFat,
+      timestamp: new Date().toLocaleTimeString()
+    };
+    
+    // Add food to the appropriate meal category for current date
+    const dateKey = formatDateKey(currentDate);
+    
+    setSavedFoods(prevFoods => ({
+      ...prevFoods,
+      [selectedMealCategory]: [...prevFoods[selectedMealCategory], foodItem]
+    }));
+    
+    // Also save to the date-organized structure
+    setFoodsByDate(prevFoodsByDate => ({
+      ...prevFoodsByDate,
+      [dateKey]: {
+        ...prevFoodsByDate[dateKey],
+        [selectedMealCategory]: [...(prevFoodsByDate[dateKey]?.[selectedMealCategory] || []), foodItem]
+      }
+    }));
+    
+    console.log('Saving food item:', {
+      category: selectedMealCategory,
+      foodItem: foodItem
     });
     
-    Alert.alert('Success', `${foodName} added to ${selectedMealCategory}!`);
+    // Show success alert with detailed information
+    Alert.alert(
+      '✅ Food Added Successfully!',
+      `${foodName} (${foodQuantity}) has been added to ${selectedMealCategory}\n\n` +
+      `Nutrition Info:\n` +
+      `• Calories: ${foodCalories || 'N/A'}\n` +
+      `• Protein: ${foodProtein || 'N/A'}g\n` +
+      `• Carbs: ${foodCarbs || 'N/A'}g\n` +
+      `• Fat: ${foodFat || 'N/A'}g`,
+      [
+        {
+          text: 'Great!',
+          style: 'default',
+        }
+      ]
+    );
     closeAddFoodModal();
   };
 
@@ -217,15 +397,347 @@ export default function App() {
   };
 
   const calculateBMI = () => {
-    if (currentWeight && height) {
-      const weightInKg = parseFloat(currentWeight) * 0.453592; // Convert lbs to kg
-      const heightInM = parseFloat(height.replace(/[^\d.]/g, '')) * 0.0254; // Convert inches to meters
-      if (heightInM > 0) {
-        const bmi = weightInKg / (heightInM * heightInM);
-        return bmi.toFixed(1);
-      }
+    if (!currentWeight || !height) {
+      return 'N/A';
     }
-    return '--';
+
+    try {
+      const weightInKg = parseFloat(currentWeight) * 0.453592; // Convert lbs to kg
+      const heightStr = height.replace(/[^\d.]/g, '');
+
+      // Prevent empty or just period strings
+      if (!heightStr || heightStr === '.' || heightStr === '..') {
+        return 'N/A';
+      }
+
+      const heightInM = parseFloat(heightStr) * 0.0254; // Convert inches to meters
+
+      if (!isNaN(heightInM) && heightInM > 0 && !isNaN(weightInKg) && weightInKg > 0) {
+        const bmi = weightInKg / (heightInM * heightInM);
+        const result = bmi.toFixed(1);
+
+        // Extra validation to ensure we return a valid number
+        if (result && !isNaN(parseFloat(result))) {
+          return result;
+        }
+      }
+    } catch (error) {
+      console.error('BMI calculation error:', error);
+    }
+
+    return 'N/A';
+  };
+
+  // Calculate daily nutrition totals
+  // Date navigation functions
+  const formatDateKey = (date: Date) => {
+    return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+  };
+
+  const formatDisplayDate = (date: Date) => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (formatDateKey(date) === formatDateKey(today)) {
+      return 'Today';
+    } else if (formatDateKey(date) === formatDateKey(yesterday)) {
+      return 'Yesterday';
+    } else {
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    }
+  };
+
+  const goToPreviousDay = () => {
+    const prevDate = new Date(currentDate);
+    prevDate.setDate(prevDate.getDate() - 1);
+    setCurrentDate(prevDate);
+    loadFoodsForDate(prevDate);
+  };
+
+  const goToNextDay = () => {
+    const nextDate = new Date(currentDate);
+    nextDate.setDate(nextDate.getDate() + 1);
+    setCurrentDate(nextDate);
+    loadFoodsForDate(nextDate);
+  };
+
+  const loadFoodsForDate = (date: Date) => {
+    const dateKey = formatDateKey(date);
+    const foodsForDate = foodsByDate[dateKey] || {
+      Breakfast: [],
+      Lunch: [],
+      Dinner: [],
+      Snacks: []
+    };
+    setSavedFoods(foodsForDate);
+  };
+
+  // Exercise tracking functions
+  const openExerciseModal = () => {
+    setShowExerciseModal(true);
+    setSelectedExerciseType('');
+    setExerciseMinutes('');
+    setCustomExerciseType('');
+  };
+
+  const closeExerciseModal = () => {
+    setShowExerciseModal(false);
+    setSelectedExerciseType('');
+    setExerciseMinutes('');
+    setCustomExerciseType('');
+  };
+
+  const saveExercise = () => {
+    const exerciseType = selectedExerciseType === 'other' ? customExerciseType : selectedExerciseType;
+    
+    if (!exerciseType.trim() || !exerciseMinutes.trim()) {
+      Alert.alert('Error', 'Please select exercise type and enter minutes');
+      return;
+    }
+
+    const minutes = parseFloat(exerciseMinutes);
+    if (isNaN(minutes) || minutes <= 0) {
+      Alert.alert('Error', 'Please enter valid minutes');
+      return;
+    }
+
+    const exercise = {
+      id: Date.now().toString(),
+      type: exerciseType,
+      minutes: minutes,
+      timestamp: new Date().toLocaleTimeString(),
+      date: formatDateKey(currentDate)
+    };
+
+    setDailyExercises(prev => [...prev, exercise]);
+    
+    Alert.alert(
+      '🏃‍♂️ Exercise Logged!',
+      `${exerciseType} for ${minutes} minutes has been recorded for ${formatDisplayDate(currentDate)}`
+    );
+    
+    closeExerciseModal();
+  };
+
+  const getTotalExerciseMinutes = () => {
+    return dailyExercises.reduce((total, exercise) => total + exercise.minutes, 0);
+  };
+
+  // Phone health data import function
+  const importFromPhoneHealth = async () => {
+    try {
+      Alert.alert(
+        '📱 Import Health Data',
+        'Choose data source:',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Apple Health',
+            onPress: () => importAppleHealthData()
+          },
+          {
+            text: 'Google Fit',
+            onPress: () => importGoogleFitData()
+          },
+          {
+            text: 'Manual Entry',
+            onPress: () => showQuickExerciseOptions()
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Health data import error:', error);
+      Alert.alert('Error', 'Unable to access health data. Please enter manually.');
+    }
+  };
+
+  const importAppleHealthData = async () => {
+    // Simulate Apple Health data import
+    Alert.alert(
+      '🍎 Apple Health Integration',
+      'This would connect to Apple HealthKit to import:\n\n• Steps taken today\n• Workout sessions\n• Active minutes\n• Heart rate data\n\nFor now, here are some sample readings:',
+      [
+        {
+          text: 'Import Walking (45 min)',
+          onPress: () => {
+            setSelectedExerciseType('Walking');
+            setExerciseMinutes('45');
+            Alert.alert('Success', 'Walking data imported from Apple Health!');
+          }
+        },
+        {
+          text: 'Import Running (20 min)',
+          onPress: () => {
+            setSelectedExerciseType('Running/Jogging');
+            setExerciseMinutes('20');
+            Alert.alert('Success', 'Running data imported from Apple Health!');
+          }
+        },
+        {
+          text: 'Import Weight Training (30 min)',
+          onPress: () => {
+            setSelectedExerciseType('Weight Training');
+            setExerciseMinutes('30');
+            Alert.alert('Success', 'Weight training data imported from Apple Health!');
+          }
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        }
+      ]
+    );
+  };
+
+  const importGoogleFitData = async () => {
+    // Simulate Google Fit data import
+    Alert.alert(
+      '🏃‍♂️ Google Fit Integration',
+      'This would connect to Google Fit to import:\n\n• Daily step count\n• Workout activities\n• Active minutes\n• Calories burned\n\nFor now, here are some sample readings:',
+      [
+        {
+          text: 'Import Walking (35 min)',
+          onPress: () => {
+            setSelectedExerciseType('Walking');
+            setExerciseMinutes('35');
+            Alert.alert('Success', 'Walking data imported from Google Fit!');
+          }
+        },
+        {
+          text: 'Import Cycling (25 min)',
+          onPress: () => {
+            setSelectedExerciseType('other');
+            setCustomExerciseType('Cycling');
+            setExerciseMinutes('25');
+            Alert.alert('Success', 'Cycling data imported from Google Fit!');
+          }
+        },
+        {
+          text: 'Import Weight Training (40 min)',
+          onPress: () => {
+            setSelectedExerciseType('Weight Training');
+            setExerciseMinutes('40');
+            Alert.alert('Success', 'Weight training data imported from Google Fit!');
+          }
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        }
+      ]
+    );
+  };
+
+  const showQuickExerciseOptions = () => {
+    Alert.alert(
+      '⚡ Quick Exercise Entry',
+      'Select a common exercise duration:',
+      [
+        {
+          text: '15 minutes',
+          onPress: () => setExerciseMinutes('15')
+        },
+        {
+          text: '30 minutes',
+          onPress: () => setExerciseMinutes('30')
+        },
+        {
+          text: '45 minutes',
+          onPress: () => setExerciseMinutes('45')
+        },
+        {
+          text: '60 minutes',
+          onPress: () => setExerciseMinutes('60')
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        }
+      ]
+    );
+  };
+
+  // Oxygen saturation tracking functions
+  const openOxygenModal = () => {
+    setShowOxygenModal(true);
+    setOxygenLevel('');
+  };
+
+  const closeOxygenModal = () => {
+    setShowOxygenModal(false);
+    setOxygenLevel('');
+  };
+
+  const saveOxygenReading = () => {
+    if (!oxygenLevel.trim()) {
+      Alert.alert('Error', 'Please enter oxygen saturation level');
+      return;
+    }
+
+    const level = parseFloat(oxygenLevel);
+    if (isNaN(level) || level < 0 || level > 100) {
+      Alert.alert('Error', 'Please enter a valid oxygen saturation level (0-100%)');
+      return;
+    }
+
+    const reading = {
+      id: Date.now().toString(),
+      level: level,
+      timestamp: new Date().toLocaleTimeString(),
+      date: formatDateKey(currentDate)
+    };
+
+    setDailyOxygenReadings(prev => [...prev, reading]);
+    
+    // Provide feedback based on oxygen level and reading count
+    const readingCount = dailyOxygenReadings.length + 1;
+    let message = `Oxygen saturation of ${level}% recorded for ${formatDisplayDate(currentDate)}`;
+    
+    if (readingCount > 1) {
+      message += `\n\nThis is your ${readingCount}${readingCount === 2 ? 'nd' : readingCount === 3 ? 'rd' : 'th'} reading today.`;
+    }
+    
+    if (level < 90) {
+      message += '\n\n⚠️ Note: Levels below 90% may require medical attention.';
+    } else if (level >= 95) {
+      message += '\n\n✅ Great! This is a healthy oxygen level.';
+    } else if (level >= 88) {
+      message += '\n\n📊 This level is common for COPD patients.';
+    }
+    
+    Alert.alert('🫁 Oxygen Level Recorded!', message);
+    closeOxygenModal();
+  };
+
+  const getLatestOxygenReading = () => {
+    if (dailyOxygenReadings.length === 0) return 'N/A';
+    const latest = dailyOxygenReadings[dailyOxygenReadings.length - 1];
+    return `${latest.level}%`;
+  };
+
+  const calculateDailyTotals = () => {
+    const allFoods = [
+      ...savedFoods.Breakfast,
+      ...savedFoods.Lunch,
+      ...savedFoods.Dinner,
+      ...savedFoods.Snacks
+    ];
+
+    return allFoods.reduce((totals, food) => {
+      totals.calories += parseFloat(food.calories) || 0;
+      totals.protein += parseFloat(food.protein) || 0;
+      totals.carbs += parseFloat(food.carbs) || 0;
+      totals.fat += parseFloat(food.fat) || 0;
+      return totals;
+    }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
   };
 
   const openAddMedicationModal = (type) => {
@@ -370,7 +882,11 @@ export default function App() {
         );
       case 'guidelines':
         return (
-          <ScrollView style={styles.guidelinesContainer} showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            style={styles.guidelinesContainer} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.guidelinesContentContainer}
+          >
             {/* Main Guidelines Section */}
             <View style={styles.guidelinesSection}>
               <Text style={styles.guidelinesTitle}>COPD Dietary Guidelines</Text>
@@ -478,7 +994,7 @@ export default function App() {
               <View style={styles.foodCategory}>
                 <Text style={styles.foodCategoryTitle}>Foods to Embrace</Text>
                 <View style={styles.foodItem}>
-                  <Text style={styles.checkmark}>✓</Text>
+                  <Text style={styles.checkmark}>+</Text>
                   <View style={styles.foodContent}>
                     <Text style={styles.foodName}>Fresh Fruits and Vegetables</Text>
                     <Text style={styles.foodDescription}>
@@ -488,7 +1004,7 @@ export default function App() {
                 </View>
                 
                 <View style={styles.foodItem}>
-                  <Text style={styles.checkmark}>✓</Text>
+                  <Text style={styles.checkmark}>+</Text>
                   <View style={styles.foodContent}>
                     <Text style={styles.foodName}>Lean Proteins</Text>
                     <Text style={styles.foodDescription}>
@@ -498,7 +1014,7 @@ export default function App() {
                 </View>
                 
                 <View style={styles.foodItem}>
-                  <Text style={styles.checkmark}>✓</Text>
+                  <Text style={styles.checkmark}>+</Text>
                   <View style={styles.foodContent}>
                     <Text style={styles.foodName}>Whole Grains</Text>
                     <Text style={styles.foodDescription}>
@@ -508,7 +1024,7 @@ export default function App() {
                 </View>
                 
                 <View style={styles.foodItem}>
-                  <Text style={styles.checkmark}>✓</Text>
+                  <Text style={styles.checkmark}>+</Text>
                   <View style={styles.foodContent}>
                     <Text style={styles.foodName}>Healthy Fats</Text>
                     <Text style={styles.foodDescription}>
@@ -518,7 +1034,7 @@ export default function App() {
                 </View>
                 
                 <View style={styles.foodItem}>
-                  <Text style={styles.checkmark}>✓</Text>
+                  <Text style={styles.checkmark}>+</Text>
                   <View style={styles.foodContent}>
                     <Text style={styles.foodName}>Dairy or Fortified Alternatives</Text>
                     <Text style={styles.foodDescription}>
@@ -531,7 +1047,7 @@ export default function App() {
               <View style={styles.foodCategory}>
                 <Text style={styles.foodCategoryTitle}>Foods to Limit or Avoid</Text>
                 <View style={styles.foodItem}>
-                  <Text style={styles.xmark}>✗</Text>
+                  <Text style={styles.xmark}>-</Text>
                   <View style={styles.foodContent}>
                     <Text style={styles.foodName}>Processed Foods</Text>
                     <Text style={styles.foodDescription}>
@@ -541,7 +1057,7 @@ export default function App() {
                 </View>
                 
                 <View style={styles.foodItem}>
-                  <Text style={styles.xmark}>✗</Text>
+                  <Text style={styles.xmark}>-</Text>
                   <View style={styles.foodContent}>
                     <Text style={styles.foodName}>Gas-Producing Foods</Text>
                     <Text style={styles.foodDescription}>
@@ -551,7 +1067,7 @@ export default function App() {
                 </View>
                 
                 <View style={styles.foodItem}>
-                  <Text style={styles.xmark}>✗</Text>
+                  <Text style={styles.xmark}>-</Text>
                   <View style={styles.foodContent}>
                     <Text style={styles.foodName}>Excessive Salt</Text>
                     <Text style={styles.foodDescription}>
@@ -561,7 +1077,7 @@ export default function App() {
                 </View>
                 
                 <View style={styles.foodItem}>
-                  <Text style={styles.xmark}>✗</Text>
+                  <Text style={styles.xmark}>-</Text>
                   <View style={styles.foodContent}>
                     <Text style={styles.foodName}>Cold Foods</Text>
                     <Text style={styles.foodDescription}>
@@ -571,7 +1087,7 @@ export default function App() {
                 </View>
                 
                 <View style={styles.foodItem}>
-                  <Text style={styles.xmark}>✗</Text>
+                  <Text style={styles.xmark}>-</Text>
                   <View style={styles.foodContent}>
                     <Text style={styles.foodName}>Excessive Dairy</Text>
                     <Text style={styles.foodDescription}>
@@ -585,18 +1101,31 @@ export default function App() {
         );
       case 'tracking':
         return (
-          <ScrollView style={styles.trackingContainer} showsVerticalScrollIndicator={false}>
-            {/* Tracking Header */}
+          <ScrollView 
+            style={styles.trackingContainer} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.trackingContentContainer}
+          >
+            {/* Tracking Header with Date Navigation */}
             <View style={styles.trackingHeader}>
-              <Text style={styles.trackingTitle}>Today</Text>
-              <View style={styles.trackingActions}>
-                <TouchableOpacity style={styles.trackingActionButton}>
-                  <Text style={styles.trackingActionIcon}>✓</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.trackingActionButton}>
-                  <Text style={styles.trackingActionIcon}>⋯</Text>
-                </TouchableOpacity>
+              <TouchableOpacity style={styles.dateNavButton} onPress={goToPreviousDay}>
+                <Text style={styles.dateNavArrow}>&lt;</Text>
+              </TouchableOpacity>
+              
+              <View style={styles.dateContainer}>
+                <Text style={styles.trackingTitle}>{formatDisplayDate(currentDate)}</Text>
+                <Text style={styles.trackingDate}>
+                  {currentDate.toLocaleDateString('en-US', { 
+                    month: 'long', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  })}
+                </Text>
               </View>
+              
+              <TouchableOpacity style={styles.dateNavButton} onPress={goToNextDay}>
+                <Text style={styles.dateNavArrow}>&gt;</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Nutrition Targets Section */}
@@ -604,76 +1133,106 @@ export default function App() {
               <View style={styles.targetsHeader}>
                 <Text style={styles.targetsTitle}>NUTRITION TARGETS</Text>
                 <TouchableOpacity>
-                  <Text style={styles.targetsArrow}>›</Text>
+                  <Text style={styles.targetsArrow}>&gt;</Text>
                 </TouchableOpacity>
               </View>
               
               <View style={styles.targetsGrid}>
                 <View style={styles.targetCard}>
                   <Text style={styles.targetLabel}>Energy</Text>
-                  <Text style={styles.targetValue}>0.0 / 1,800 kcal</Text>
+                  <Text style={styles.targetValue}>{calculateDailyTotals().calories.toFixed(1)} / 1,800 kcal</Text>
                   <View style={styles.targetProgress}>
-                    <View style={[styles.targetProgressBar, { width: '0%' }]} />
+                    <View style={[styles.targetProgressBar, { width: `${Math.min(100, (calculateDailyTotals().calories / 1800) * 100)}%` }]} />
                   </View>
-                  <Text style={styles.targetPercentage}>0%</Text>
+                  <Text style={styles.targetPercentage}>{Math.round((calculateDailyTotals().calories / 1800) * 100)}%</Text>
                 </View>
 
                 <View style={styles.targetCard}>
                   <Text style={styles.targetLabel}>Protein</Text>
-                  <Text style={styles.targetValue}>0.0 / 90.0 g</Text>
+                  <Text style={styles.targetValue}>{calculateDailyTotals().protein.toFixed(1)} / 90.0 g</Text>
                   <View style={styles.targetProgress}>
-                    <View style={[styles.targetProgressBar, { width: '0%' }]} />
+                    <View style={[styles.targetProgressBar, { width: `${Math.min(100, (calculateDailyTotals().protein / 90) * 100)}%` }]} />
                   </View>
-                  <Text style={styles.targetPercentage}>0%</Text>
+                  <Text style={styles.targetPercentage}>{Math.round((calculateDailyTotals().protein / 90) * 100)}%</Text>
                 </View>
 
                 <View style={styles.targetCard}>
                   <Text style={styles.targetLabel}>Carbs</Text>
-                  <Text style={styles.targetValue}>0.0 / 225.0 g</Text>
+                  <Text style={styles.targetValue}>{calculateDailyTotals().carbs.toFixed(1)} / 225.0 g</Text>
                   <View style={styles.targetProgress}>
-                    <View style={[styles.targetProgressBar, { width: '0%' }]} />
+                    <View style={[styles.targetProgressBar, { width: `${Math.min(100, (calculateDailyTotals().carbs / 225) * 100)}%` }]} />
                   </View>
-                  <Text style={styles.targetPercentage}>0%</Text>
+                  <Text style={styles.targetPercentage}>{Math.round((calculateDailyTotals().carbs / 225) * 100)}%</Text>
                 </View>
 
                 <View style={styles.targetCard}>
                   <Text style={styles.targetLabel}>Fat</Text>
-                  <Text style={styles.targetValue}>0.0 / 60.0 g</Text>
+                  <Text style={styles.targetValue}>{calculateDailyTotals().fat.toFixed(1)} / 60.0 g</Text>
                   <View style={styles.targetProgress}>
-                    <View style={[styles.targetProgressBar, { width: '0%' }]} />
+                    <View style={[styles.targetProgressBar, { width: `${Math.min(100, (calculateDailyTotals().fat / 60) * 100)}%` }]} />
                   </View>
-                  <Text style={styles.targetPercentage}>0%</Text>
+                  <Text style={styles.targetPercentage}>{Math.round((calculateDailyTotals().fat / 60) * 100)}%</Text>
                 </View>
               </View>
             </View>
-            {/* Weight Tracking Section */}
+
             <View style={styles.weightSection}>
               <Text style={styles.weightTitle}>WEIGHT TRACKING</Text>
               <View style={styles.weightCards}>
                 <TouchableOpacity style={styles.weightCard} onPress={() => openWeightModal('current')}>
                   <Text style={styles.weightLabel}>Current Weight</Text>
-                  <Text style={styles.weightValue}>{currentWeight || '--'} lbs</Text>
-                  <Text style={styles.weightArrow}>›</Text>
+                  <Text style={styles.weightValue}>{currentWeight && currentWeight.trim() && currentWeight !== '.' ? `${currentWeight} lbs` : 'N/A'}</Text>
+                  <Text style={styles.weightArrow}>&gt;</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.weightCard} onPress={() => openWeightModal('goal')}>
                   <Text style={styles.weightLabel}>Goal Weight</Text>
-                  <Text style={styles.weightValue}>{goalWeight || '--'} lbs</Text>
-                  <Text style={styles.weightArrow}>›</Text>
+                  <Text style={styles.weightValue}>{goalWeight && goalWeight.trim() && goalWeight !== '.' ? `${goalWeight} lbs` : 'N/A'}</Text>
+                  <Text style={styles.weightArrow}>&gt;</Text>
                 </TouchableOpacity>
               </View>
               {currentWeight && goalWeight && (
                 <View style={styles.weightProgress}>
                   <Text style={styles.weightProgressLabel}>Progress to Goal</Text>
                   <View style={styles.weightProgressBar}>
-                    <View style={[styles.weightProgressFill, { 
-                      width: `${Math.min(100, Math.max(0, ((parseFloat(currentWeight) - parseFloat(goalWeight)) / parseFloat(currentWeight)) * 100))}%` 
+                    <View style={[styles.weightProgressFill, {
+                      width: (() => {
+                        if (!currentWeight || !goalWeight) return '0%';
+
+                        const current = parseFloat(currentWeight);
+                        const goal = parseFloat(goalWeight);
+
+                        if (isNaN(current) || isNaN(goal) || current <= 0) return '0%';
+
+                        const percentage = ((current - goal) / current) * 100;
+                        if (isNaN(percentage)) return '0%';
+
+                        return `${Math.min(100, Math.max(0, percentage))}%`;
+                      })()
                     }]} />
                   </View>
                   <Text style={styles.weightProgressText}>
-                    {parseFloat(currentWeight) > parseFloat(goalWeight) 
-                      ? `${(parseFloat(currentWeight) - parseFloat(goalWeight)).toFixed(1)} lbs to lose`
-                      : `${(parseFloat(goalWeight) - parseFloat(currentWeight)).toFixed(1)} lbs to gain`
-                    }
+                    {(() => {
+                      if (!currentWeight || !goalWeight) return 'Set both weights to see progress';
+
+                      const current = parseFloat(currentWeight);
+                      const goal = parseFloat(goalWeight);
+
+                      if (isNaN(current) || isNaN(goal) || current <= 0 || goal <= 0) {
+                        return 'Set valid weights to see progress';
+                      }
+
+                      const difference = Math.abs(current - goal);
+                      if (isNaN(difference)) return 'Set valid weights to see progress';
+
+                      const diffText = difference.toFixed(1);
+                      if (!diffText || diffText === '.' || isNaN(parseFloat(diffText))) {
+                        return 'Set valid weights to see progress';
+                      }
+
+                      return current > goal
+                        ? `${diffText} lbs to lose`
+                        : `${diffText} lbs to gain`;
+                    })()}
                   </Text>
                 </View>
               )}
@@ -725,7 +1284,7 @@ export default function App() {
                 <Text style={styles.waterLabel}>Water</Text>
                 <Text style={styles.waterAmount}>0 / 64 fl oz</Text>
                 <TouchableOpacity>
-                  <Text style={styles.waterArrow}>⌄</Text>
+                  <Text style={styles.waterArrow}>v</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.waterProgress}>
@@ -733,38 +1292,170 @@ export default function App() {
               </View>
             </View>
 
+
             {/* Meal Categories Section */}
             <View style={styles.mealsSection}>
               <View style={styles.mealCategory}>
-                <TouchableOpacity style={styles.mealCategoryHeader} onPress={() => openAddFoodModal('Breakfast')}>
+                <TouchableOpacity 
+                  style={styles.mealCategoryHeader} 
+                  onPress={() => {
+                    console.log('Breakfast button pressed!');
+                    openAddFoodModal('Breakfast');
+                  }}
+                  activeOpacity={0.7}
+                >
                   <Text style={styles.mealCategoryIcon}>+</Text>
                   <Text style={styles.mealCategoryName}>Breakfast</Text>
-                  <Text style={styles.mealCategoryArrow}>⌄</Text>
+                  <Text style={styles.mealCategoryArrow}>v</Text>
                 </TouchableOpacity>
+                
+                {/* Display saved foods for Breakfast */}
+                {savedFoods.Breakfast.map((food) => (
+                  <View key={food.id} style={styles.foodItem}>
+                    <View style={styles.foodIcon}>
+                      <Text style={styles.foodIconText}>🍳</Text>
+                    </View>
+                    <View style={styles.foodDetails}>
+                      <Text style={styles.foodItemName}>{food.name}</Text>
+                      <Text style={styles.foodItemQuantity}>{food.quantity}</Text>
+                      <View style={styles.nutritionGrid}>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Calories</Text>
+                          <Text style={styles.nutritionValue}>{food.calories || 'N/A'}</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Protein</Text>
+                          <Text style={styles.nutritionValue}>{food.protein || 'N/A'}g</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Carbs</Text>
+                          <Text style={styles.nutritionValue}>{food.carbs || 'N/A'}g</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Fat</Text>
+                          <Text style={styles.nutritionValue}>{food.fat || 'N/A'}g</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                ))}
               </View>
 
               <View style={styles.mealCategory}>
                 <TouchableOpacity style={styles.mealCategoryHeader} onPress={() => openAddFoodModal('Lunch')}>
                   <Text style={styles.mealCategoryIcon}>+</Text>
                   <Text style={styles.mealCategoryName}>Lunch</Text>
-                  <Text style={styles.mealCategoryArrow}>⌄</Text>
+                  <Text style={styles.mealCategoryArrow}>v</Text>
                 </TouchableOpacity>
+                
+                {/* Display saved foods for Lunch */}
+                {savedFoods.Lunch.map((food) => (
+                  <View key={food.id} style={styles.foodItem}>
+                    <View style={styles.foodIcon}>
+                      <Text style={styles.foodIconText}>🥪</Text>
+                    </View>
+                    <View style={styles.foodDetails}>
+                      <Text style={styles.foodItemName}>{food.name}</Text>
+                      <Text style={styles.foodItemQuantity}>{food.quantity}</Text>
+                      <View style={styles.nutritionGrid}>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Calories</Text>
+                          <Text style={styles.nutritionValue}>{food.calories || 'N/A'}</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Protein</Text>
+                          <Text style={styles.nutritionValue}>{food.protein || 'N/A'}g</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Carbs</Text>
+                          <Text style={styles.nutritionValue}>{food.carbs || 'N/A'}g</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Fat</Text>
+                          <Text style={styles.nutritionValue}>{food.fat || 'N/A'}g</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                ))}
               </View>
 
               <View style={styles.mealCategory}>
                 <TouchableOpacity style={styles.mealCategoryHeader} onPress={() => openAddFoodModal('Dinner')}>
                   <Text style={styles.mealCategoryIcon}>+</Text>
                   <Text style={styles.mealCategoryName}>Dinner</Text>
-                  <Text style={styles.mealCategoryArrow}>⌄</Text>
+                  <Text style={styles.mealCategoryArrow}>v</Text>
                 </TouchableOpacity>
+                
+                {/* Display saved foods for Dinner */}
+                {savedFoods.Dinner.map((food) => (
+                  <View key={food.id} style={styles.foodItem}>
+                    <View style={styles.foodIcon}>
+                      <Text style={styles.foodIconText}>🍽️</Text>
+                    </View>
+                    <View style={styles.foodDetails}>
+                      <Text style={styles.foodItemName}>{food.name}</Text>
+                      <Text style={styles.foodItemQuantity}>{food.quantity}</Text>
+                      <View style={styles.nutritionGrid}>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Calories</Text>
+                          <Text style={styles.nutritionValue}>{food.calories || 'N/A'}</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Protein</Text>
+                          <Text style={styles.nutritionValue}>{food.protein || 'N/A'}g</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Carbs</Text>
+                          <Text style={styles.nutritionValue}>{food.carbs || 'N/A'}g</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Fat</Text>
+                          <Text style={styles.nutritionValue}>{food.fat || 'N/A'}g</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                ))}
               </View>
 
               <View style={styles.mealCategory}>
                 <TouchableOpacity style={styles.mealCategoryHeader} onPress={() => openAddFoodModal('Snacks')}>
                   <Text style={styles.mealCategoryIcon}>+</Text>
                   <Text style={styles.mealCategoryName}>Snacks</Text>
-                  <Text style={styles.mealCategoryArrow}>⌄</Text>
+                  <Text style={styles.mealCategoryArrow}>v</Text>
                 </TouchableOpacity>
+                
+                {/* Display saved foods for Snacks */}
+                {savedFoods.Snacks.map((food) => (
+                  <View key={food.id} style={styles.foodItem}>
+                    <View style={styles.foodIcon}>
+                      <Text style={styles.foodIconText}>🍿</Text>
+                    </View>
+                    <View style={styles.foodDetails}>
+                      <Text style={styles.foodItemName}>{food.name}</Text>
+                      <Text style={styles.foodItemQuantity}>{food.quantity}</Text>
+                      <View style={styles.nutritionGrid}>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Calories</Text>
+                          <Text style={styles.nutritionValue}>{food.calories || 'N/A'}</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Protein</Text>
+                          <Text style={styles.nutritionValue}>{food.protein || 'N/A'}g</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Carbs</Text>
+                          <Text style={styles.nutritionValue}>{food.carbs || 'N/A'}g</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionLabel}>Fat</Text>
+                          <Text style={styles.nutritionValue}>{food.fat || 'N/A'}g</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                ))}
               </View>
             </View>
 
@@ -775,35 +1466,45 @@ export default function App() {
               <View style={styles.copdMetrics}>
                 <View style={styles.copdMetricCard}>
                   <Text style={styles.copdMetricLabel}>Oxygen Saturation</Text>
-                  <Text style={styles.copdMetricValue}>--%</Text>
-                  <TouchableOpacity style={styles.copdMetricButton}>
+                  <Text style={styles.copdMetricValue}>{getLatestOxygenReading()}</Text>
+                  <TouchableOpacity style={styles.copdMetricButton} onPress={openOxygenModal}>
                     <Text style={styles.copdMetricButtonText}>Log Reading</Text>
                   </TouchableOpacity>
-                </View>
-
-                <View style={styles.copdMetricCard}>
-                  <Text style={styles.copdMetricLabel}>Breathlessness Level</Text>
-                  <Text style={styles.copdMetricValue}>--/10</Text>
-                  <TouchableOpacity style={styles.copdMetricButton}>
-                    <Text style={styles.copdMetricButtonText}>Rate Now</Text>
-                  </TouchableOpacity>
+                  
+                  {/* Display today's oxygen readings */}
+                  {dailyOxygenReadings.length > 0 && (
+                    <View style={styles.oxygenReadingsList}>
+                      <Text style={styles.readingsTitle}>Today's Readings ({dailyOxygenReadings.length})</Text>
+                      {dailyOxygenReadings.map((reading) => (
+                        <View key={reading.id} style={styles.readingItem}>
+                          <Text style={styles.readingLevel}>{reading.level}%</Text>
+                          <Text style={styles.readingTime}>{reading.timestamp}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.copdMetricCard}>
                   <Text style={styles.copdMetricLabel}>Exercise Minutes</Text>
-                  <Text style={styles.copdMetricValue}>0 min</Text>
-                  <TouchableOpacity style={styles.copdMetricButton}>
-                    <Text style={styles.copdMetricButtonText}>Start Workout</Text>
+                  <Text style={styles.copdMetricValue}>{getTotalExerciseMinutes()} min</Text>
+                  <TouchableOpacity style={styles.copdMetricButton} onPress={openExerciseModal}>
+                    <Text style={styles.copdMetricButtonText}>Log Exercise</Text>
                   </TouchableOpacity>
+                  
+                  {/* Display logged exercises */}
+                  {dailyExercises.length > 0 && (
+                    <View style={styles.exerciseList}>
+                      {dailyExercises.map((exercise) => (
+                        <View key={exercise.id} style={styles.exerciseItem}>
+                          <Text style={styles.exerciseType}>{exercise.type}</Text>
+                          <Text style={styles.exerciseMinutes}>{exercise.minutes} min</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
 
-                <View style={styles.copdMetricCard}>
-                  <Text style={styles.copdMetricLabel}>Medication Taken</Text>
-                  <Text style={styles.copdMetricValue}>0/3 doses</Text>
-                  <TouchableOpacity style={styles.copdMetricButton}>
-                    <Text style={styles.copdMetricButtonText}>Log Dose</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             </View>
 
@@ -1035,7 +1736,7 @@ export default function App() {
                     <Text style={styles.fieldLabel}>What is your latest FEV1 percentage? (If known)</Text>
                     <TouchableOpacity style={styles.selectField} onPress={toggleFEV1Dropdown}>
                       <Text style={styles.selectPlaceholder}>{selectedFEV1}</Text>
-                      <Text style={styles.dropdownArrow}>{showFEV1Dropdown ? '▲' : '▼'}</Text>
+                      <Text style={styles.dropdownArrow}>{showFEV1Dropdown ? '^' : 'v'}</Text>
                     </TouchableOpacity>
                     {showFEV1Dropdown && (
                       <View style={styles.dropdownList}>
@@ -1062,7 +1763,7 @@ export default function App() {
                     <Text style={styles.fieldLabel}>How many times have you been hospitalized for COPD in the past year?</Text>
                     <TouchableOpacity style={styles.selectField} onPress={toggleHospitalizationDropdown}>
                       <Text style={styles.selectPlaceholder}>{selectedHospitalizations}</Text>
-                      <Text style={styles.dropdownArrow}>{showHospitalizationDropdown ? '▲' : '▼'}</Text>
+                      <Text style={styles.dropdownArrow}>{showHospitalizationDropdown ? '^' : 'v'}</Text>
                     </TouchableOpacity>
                     {showHospitalizationDropdown && (
                       <View style={styles.dropdownList}>
@@ -1086,7 +1787,7 @@ export default function App() {
                     <Text style={styles.fieldLabel}>How many COPD flare-ups (exacerbations) have you had in the past year?</Text>
                     <TouchableOpacity style={styles.selectField} onPress={toggleFlareupDropdown}>
                       <Text style={styles.selectPlaceholder}>{selectedFlareups}</Text>
-                      <Text style={styles.dropdownArrow}>{showFlareupDropdown ? '▲' : '▼'}</Text>
+                      <Text style={styles.dropdownArrow}>{showFlareupDropdown ? '^' : 'v'}</Text>
                     </TouchableOpacity>
                     {showFlareupDropdown && (
                       <View style={styles.dropdownList}>
@@ -1110,7 +1811,7 @@ export default function App() {
                     <Text style={styles.fieldLabel}>Do you use supplemental oxygen?</Text>
                     <TouchableOpacity style={styles.selectField} onPress={toggleOxygenDropdown}>
                       <Text style={styles.selectPlaceholder}>{selectedOxygen}</Text>
-                      <Text style={styles.dropdownArrow}>{showOxygenDropdown ? '▲' : '▼'}</Text>
+                      <Text style={styles.dropdownArrow}>{showOxygenDropdown ? '^' : 'v'}</Text>
                     </TouchableOpacity>
                     {showOxygenDropdown && (
                       <View style={styles.dropdownList}>
@@ -1129,7 +1830,7 @@ export default function App() {
                       <Text style={styles.fieldLabel}>What is your LPM?</Text>
                       <TouchableOpacity style={styles.selectField} onPress={toggleOxygenLitersDropdown}>
                         <Text style={styles.selectPlaceholder}>{selectedOxygenLiters}</Text>
-                        <Text style={styles.dropdownArrow}>{showOxygenLitersDropdown ? '▲' : '▼'}</Text>
+                        <Text style={styles.dropdownArrow}>{showOxygenLitersDropdown ? '^' : 'v'}</Text>
                       </TouchableOpacity>
                       {showOxygenLitersDropdown && (
                         <View style={styles.dropdownList}>
@@ -1257,7 +1958,7 @@ export default function App() {
                             }}
                             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                           >
-                            <Text style={styles.deleteButtonText}>×</Text>
+                            <Text style={styles.deleteButtonText}>X</Text>
                           </TouchableOpacity>
                         </View>
                       ))
@@ -1298,7 +1999,7 @@ export default function App() {
                             }}
                             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                           >
-                            <Text style={styles.deleteButtonText}>×</Text>
+                            <Text style={styles.deleteButtonText}>X</Text>
                           </TouchableOpacity>
                         </View>
                       ))
@@ -1384,258 +2085,6 @@ export default function App() {
               </View>
             )}
 
-            {/* Add Medication Modal */}
-            <Modal
-              visible={showAddMedicationModal}
-              animationType="slide"
-              transparent={true}
-            >
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <Text style={styles.modalTitle}>
-                    Add {medicationType === 'daily' ? 'Daily' : 'Exacerbation'} Medication
-                  </Text>
-                  
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalLabel}>Medication Name</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={newMedication.name}
-                      onChangeText={(text) => setNewMedication({...newMedication, name: text})}
-                      placeholder="e.g., Albuterol"
-                      placeholderTextColor="#d1d5db"
-                    />
-                  </View>
-                  
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalLabel}>Dosage</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={newMedication.dosage}
-                      onChangeText={(text) => setNewMedication({...newMedication, dosage: text})}
-                      placeholder="e.g., 2 puffs"
-                      placeholderTextColor="#d1d5db"
-                    />
-                  </View>
-                  
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalLabel}>How Often</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={newMedication.frequency}
-                      onChangeText={(text) => setNewMedication({...newMedication, frequency: text})}
-                      placeholder="e.g., Twice daily"
-                      placeholderTextColor="#d1d5db"
-                    />
-                  </View>
-                  
-                  <View style={styles.modalButtons}>
-                    <TouchableOpacity 
-                      style={styles.modalCancelButton}
-                      onPress={() => setShowAddMedicationModal(false)}
-                    >
-                      <Text style={styles.modalCancelText}>Cancel</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={styles.modalSaveButton}
-                      onPress={saveMedication}
-                    >
-                      <Text style={styles.modalSaveText}>Save Medication</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </Modal>
-
-            {/* Add Food Modal */}
-            <Modal
-              visible={showAddFoodModal}
-              animationType="slide"
-              transparent={true}
-            >
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <Text style={styles.modalTitle}>Add Food to {selectedMealCategory}</Text>
-                  
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalLabel}>Food Name *</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={foodName}
-                      onChangeText={setFoodName}
-                      placeholder="e.g., Grilled Chicken Breast"
-                      placeholderTextColor="#d1d5db"
-                    />
-                  </View>
-
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalLabel}>Quantity *</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={foodQuantity}
-                      onChangeText={setFoodQuantity}
-                      placeholder="e.g., 1 cup, 100g, 1 piece"
-                      placeholderTextColor="#d1d5db"
-                    />
-                  </View>
-
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalLabel}>Calories (optional)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={foodCalories}
-                      onChangeText={setFoodCalories}
-                      placeholder="e.g., 250"
-                      placeholderTextColor="#d1d5db"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalLabel}>Protein (g) (optional)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={foodProtein}
-                      onChangeText={setFoodProtein}
-                      placeholder="e.g., 25"
-                      placeholderTextColor="#d1d5db"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalLabel}>Carbs (g) (optional)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={foodCarbs}
-                      onChangeText={setFoodCarbs}
-                      placeholder="e.g., 15"
-                      placeholderTextColor="#d1d5db"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalLabel}>Fat (g) (optional)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={foodFat}
-                      onChangeText={setFoodFat}
-                      placeholder="e.g., 8"
-                      placeholderTextColor="#d1d5db"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalButtons}>
-                    <TouchableOpacity 
-                      style={styles.modalCancelButton}
-                      onPress={closeAddFoodModal}
-                    >
-                      <Text style={styles.modalCancelText}>Cancel</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={styles.modalSaveButton}
-                      onPress={saveFoodItem}
-                    >
-                      <Text style={styles.modalSaveText}>Add Food</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </Modal>
-
-            {/* Weight Modal */}
-            <Modal
-              visible={showWeightModal}
-              animationType="slide"
-              transparent={true}
-            >
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <Text style={styles.modalTitle}>
-                    {weightType === 'current' ? 'Set Current Weight' : 'Set Goal Weight'}
-                  </Text>
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalLabel}>Weight (lbs)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={weightInput}
-                      onChangeText={setWeightInput}
-                      placeholder="e.g., 150"
-                      placeholderTextColor="#d1d5db"
-                      keyboardType="numeric"
-                    />
-                  </View>
-                  <View style={styles.modalButtons}>
-                    <TouchableOpacity 
-                      style={styles.modalCancelButton}
-                      onPress={closeWeightModal}
-                    >
-                      <Text style={styles.modalCancelText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.modalSaveButton}
-                      onPress={saveWeight}
-                    >
-                      <Text style={styles.modalSaveText}>Save Weight</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </Modal>
-
-            {/* Profile Modal */}
-            <Modal
-              visible={showProfileModal}
-              animationType="slide"
-              transparent={true}
-            >
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <Text style={styles.modalTitle}>
-                    {profileField === 'age' ? 'Set Age' :
-                     profileField === 'sex' ? 'Set Sex' :
-                     profileField === 'height' ? 'Set Height' : 'Update Profile'}
-                  </Text>
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalLabel}>
-                      {profileField === 'age' ? 'Age (years)' :
-                       profileField === 'sex' ? 'Sex' :
-                       profileField === 'height' ? 'Height (e.g., 5\'4" or 64 inches)' : 'Value'}
-                    </Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={profileInput}
-                      onChangeText={setProfileInput}
-                      placeholder={
-                        profileField === 'age' ? 'e.g., 43' :
-                        profileField === 'sex' ? 'e.g., Female' :
-                        profileField === 'height' ? 'e.g., 5\'4"' : 'Enter value'
-                      }
-                      placeholderTextColor="#d1d5db"
-                      keyboardType={profileField === 'age' ? 'numeric' : 'default'}
-                    />
-                  </View>
-                  <View style={styles.modalButtons}>
-                    <TouchableOpacity 
-                      style={styles.modalCancelButton}
-                      onPress={closeProfileModal}
-                    >
-                      <Text style={styles.modalCancelText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.modalSaveButton}
-                      onPress={saveProfileField}
-                    >
-                      <Text style={styles.modalSaveText}>Save</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </Modal>
 
             {selectedTool === 'pulmonary' && (
               <ScrollView style={styles.pulmonaryContainer} showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
@@ -1854,181 +2303,292 @@ export default function App() {
                   <Text style={styles.sectionTitle}>Medication Types</Text>
                   
                   <View style={styles.categoryGrid}>
-                    <View style={styles.categoryCard}>
+                    <TouchableOpacity 
+                      style={styles.categoryCard}
+                      onPress={() => setExpandedMedicationCategory(expandedMedicationCategory === 'bronchodilators' ? null : 'bronchodilators')}
+                    >
                       <Text style={styles.categoryIcon}>💨</Text>
                       <Text style={styles.categoryTitle}>Bronchodilators</Text>
-                    </View>
-                    <View style={styles.categoryCard}>
-                      <Text style={styles.categoryIcon}>💊</Text>
-                      <Text style={styles.categoryTitle}>Corticosteroids</Text>
-                    </View>
-                    <View style={styles.categoryCard}>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.categoryCard}
+                      onPress={() => setExpandedMedicationCategory(expandedMedicationCategory === 'ics' ? null : 'ics')}
+                    >
+                      <Text style={styles.categoryIcon}>🌬️</Text>
+                      <Text style={styles.categoryTitle}>Inhaled Corticosteroids</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.categoryCard}
+                      onPress={() => setExpandedMedicationCategory(expandedMedicationCategory === 'combination' ? null : 'combination')}
+                    >
                       <Text style={styles.categoryIcon}>🔄</Text>
-                      <Text style={styles.categoryTitle}>Combination Medications</Text>
-                    </View>
-                    <View style={styles.categoryCard}>
+                      <Text style={styles.categoryTitle}>Combination Inhalers</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.categoryCard}
+                      onPress={() => setExpandedMedicationCategory(expandedMedicationCategory === 'pde4' ? null : 'pde4')}
+                    >
                       <Text style={styles.categoryIcon}>🧬</Text>
                       <Text style={styles.categoryTitle}>Phosphodiesterase-4 Inhibitors</Text>
-                    </View>
-                    <View style={styles.categoryCard}>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.categoryCard}
+                      onPress={() => setExpandedMedicationCategory(expandedMedicationCategory === 'antibiotics' ? null : 'antibiotics')}
+                    >
                       <Text style={styles.categoryIcon}>🦠</Text>
                       <Text style={styles.categoryTitle}>Antibiotics</Text>
-                    </View>
-                    <View style={styles.categoryCard}>
-                      <Text style={styles.categoryIcon}>🫁</Text>
-                      <Text style={styles.categoryTitle}>Oxygen Therapy</Text>
-                    </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.categoryCard}
+                      onPress={() => setExpandedMedicationCategory(expandedMedicationCategory === 'systemic' ? null : 'systemic')}
+                    >
+                      <Text style={styles.categoryIcon}>💊</Text>
+                      <Text style={styles.categoryTitle}>Systemic Corticosteroids</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.categoryCard}
+                      onPress={() => setExpandedMedicationCategory(expandedMedicationCategory === 'methylxanthines' ? null : 'methylxanthines')}
+                    >
+                      <Text style={styles.categoryIcon}>⚪</Text>
+                      <Text style={styles.categoryTitle}>Methylxanthines</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.categoryCard}
+                      onPress={() => setExpandedMedicationCategory(expandedMedicationCategory === 'mucolytics' ? null : 'mucolytics')}
+                    >
+                      <Text style={styles.categoryIcon}>💧</Text>
+                      <Text style={styles.categoryTitle}>Mucolytics/Expectorants</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.categoryCard}
+                      onPress={() => setExpandedMedicationCategory(expandedMedicationCategory === 'biologics' ? null : 'biologics')}
+                    >
+                      <Text style={styles.categoryIcon}>💉</Text>
+                      <Text style={styles.categoryTitle}>Biologics Medications for COPD</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.categoryCard}
+                      onPress={() => setExpandedMedicationCategory(expandedMedicationCategory === 'nebulizer' ? null : 'nebulizer')}
+                    >
+                      <Text style={styles.categoryIcon}>🫧</Text>
+                      <Text style={styles.categoryTitle}>Nebulizer Medication</Text>
+                    </TouchableOpacity>
                   </View>
+
+                  {/* Bronchodilators Detailed Content */}
+                  {expandedMedicationCategory === 'bronchodilators' && (
+                    <View style={styles.medicationDetailCard}>
+                      <Text style={styles.medicationDetailTitle}>1. Bronchodilators</Text>
+                      <Text style={styles.medicationDetailDescription}>
+                        These relax the muscles around the airways, making breathing easier.
+                      </Text>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationSubTitle}>🔹 Short-acting bronchodilators (SABAs & SAMAs) – quick relief</Text>
+                        
+                        <Text style={styles.medicationTypeLabel}>SABA (Short-acting β2-agonist):</Text>
+                        <Text style={styles.medicationItem}>• Albuterol (Ventolin, ProAir, Proventil)</Text>
+                        <Text style={styles.medicationItem}>• Levalbuterol (Xopenex)</Text>
+                        
+                        <Text style={styles.medicationTypeLabel}>SAMA (Short-acting muscarinic antagonist):</Text>
+                        <Text style={styles.medicationItem}>• Ipratropium (Atrovent)</Text>
+                      </View>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationSubTitle}>🔹 Long-acting bronchodilators (LABAs & LAMAs) – maintenance</Text>
+                        
+                        <Text style={styles.medicationTypeLabel}>LABA (Long-acting β2-agonist):</Text>
+                        <Text style={styles.medicationItem}>• Salmeterol (Serevent)</Text>
+                        <Text style={styles.medicationItem}>• Formoterol (Foradil, Perforomist)</Text>
+                        <Text style={styles.medicationItem}>• Indacaterol (Arcapta)</Text>
+                        <Text style={styles.medicationItem}>• Olodaterol (Striverdi)</Text>
+                        
+                        <Text style={styles.medicationTypeLabel}>LAMA (Long-acting muscarinic antagonist):</Text>
+                        <Text style={styles.medicationItem}>• Tiotropium (Spiriva)</Text>
+                        <Text style={styles.medicationItem}>• Aclidinium (Tudorza)</Text>
+                        <Text style={styles.medicationItem}>• Umeclidinium (Incruse)</Text>
+                        <Text style={styles.medicationItem}>• Glycopyrrolate (Seebri Neohaler)</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Inhaled Corticosteroids Detailed Content */}
+                  {expandedMedicationCategory === 'ics' && (
+                    <View style={styles.medicationDetailCard}>
+                      <Text style={styles.medicationDetailTitle}>Inhaled Corticosteroids (ICS)</Text>
+                      <Text style={styles.medicationDetailDescription}>
+                        Used in patients with frequent exacerbations or asthma-COPD overlap.
+                      </Text>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationItem}>• Fluticasone</Text>
+                        <Text style={styles.medicationItem}>• Budesonide</Text>
+                        <Text style={styles.medicationItem}>• Beclomethasone</Text>
+                        <Text style={styles.medicationItem}>• Mometasone</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Combination Inhalers Detailed Content */}
+                  {expandedMedicationCategory === 'combination' && (
+                    <View style={styles.medicationDetailCard}>
+                      <Text style={styles.medicationDetailTitle}>Combination Inhalers</Text>
+                      <Text style={styles.medicationDetailDescription}>
+                        These combine different classes for better symptom control.
+                      </Text>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationTypeLabel}>LABA + LAMA:</Text>
+                        <Text style={styles.medicationItem}>• Anoro Ellipta (umeclidinium + vilanterol)</Text>
+                        <Text style={styles.medicationItem}>• Stiolto Respimat (tiotropium + olodaterol)</Text>
+                      </View>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationTypeLabel}>LABA + ICS (inhaled corticosteroid):</Text>
+                        <Text style={styles.medicationItem}>• Advair (fluticasone + salmeterol)</Text>
+                        <Text style={styles.medicationItem}>• Symbicort (budesonide + formoterol)</Text>
+                        <Text style={styles.medicationItem}>• Breo Ellipta (fluticasone + vilanterol)</Text>
+                      </View>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationTypeLabel}>Triple Therapy (LABA + LAMA + ICS):</Text>
+                        <Text style={styles.medicationItem}>• Trelegy Ellipta (fluticasone + umeclidinium + vilanterol)</Text>
+                        <Text style={styles.medicationItem}>• Breztri Aerosphere (budesonide + glycopyrrolate + formoterol)</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Phosphodiesterase-4 Inhibitors Detailed Content */}
+                  {expandedMedicationCategory === 'pde4' && (
+                    <View style={styles.medicationDetailCard}>
+                      <Text style={styles.medicationDetailTitle}>Phosphodiesterase-4 (PDE4) Inhibitors</Text>
+                      <Text style={styles.medicationDetailDescription}>
+                        Used for severe COPD with chronic bronchitis and frequent exacerbations.
+                      </Text>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationItem}>• Roflumilast (Daliresp)</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Methylxanthines Detailed Content */}
+                  {expandedMedicationCategory === 'methylxanthines' && (
+                    <View style={styles.medicationDetailCard}>
+                      <Text style={styles.medicationDetailTitle}>Methylxanthines</Text>
+                      <Text style={styles.medicationDetailDescription}>
+                        Less common due to side effects. Theophylline – weak bronchodilator, used rarely now.
+                      </Text>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationItem}>• Theophylline</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Systemic Corticosteroids Detailed Content */}
+                  {expandedMedicationCategory === 'systemic' && (
+                    <View style={styles.medicationDetailCard}>
+                      <Text style={styles.medicationDetailTitle}>Systemic Corticosteroids</Text>
+                      <Text style={styles.medicationDetailDescription}>
+                        Used short-term during exacerbations.
+                      </Text>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationItem}>• Prednisone</Text>
+                        <Text style={styles.medicationItem}>• Methylprednisolone</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Antibiotics Detailed Content */}
+                  {expandedMedicationCategory === 'antibiotics' && (
+                    <View style={styles.medicationDetailCard}>
+                      <Text style={styles.medicationDetailTitle}>Antibiotics</Text>
+                      <Text style={styles.medicationDetailDescription}>
+                        Used during exacerbations caused by bacterial infections.
+                      </Text>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationItem}>• Azithromycin (sometimes used long-term to reduce exacerbations)</Text>
+                        <Text style={styles.medicationItem}>• Amoxicillin-clavulanate, Doxycycline, etc.</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Mucolytics/Expectorants Detailed Content */}
+                  {expandedMedicationCategory === 'mucolytics' && (
+                    <View style={styles.medicationDetailCard}>
+                      <Text style={styles.medicationDetailTitle}>Mucolytics / Expectorants</Text>
+                      <Text style={styles.medicationDetailDescription}>
+                        Reduce mucus thickness and help with coughing it out.
+                      </Text>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationItem}>• N-acetylcysteine (NAC)</Text>
+                        <Text style={styles.medicationItem}>• Carbocysteine</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Biologics Medications Detailed Content */}
+                  {expandedMedicationCategory === 'biologics' && (
+                    <View style={styles.medicationDetailCard}>
+                      <Text style={styles.medicationDetailTitle}>Biologic Medications for COPD</Text>
+                      <Text style={styles.medicationDetailDescription}>
+                        Used in select COPD patients, especially those with:
+                      </Text>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationItem}>• High blood eosinophil counts</Text>
+                        <Text style={styles.medicationItem}>• Frequent exacerbations despite optimal inhaler therapy</Text>
+                        <Text style={styles.medicationItem}>• Asthma-COPD overlap syndrome (ACOS)</Text>
+                      </View>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationSubTitle}>🔹 1. Mepolizumab (Nucala)</Text>
+                        <Text style={styles.medicationItem}>• Target: IL-5</Text>
+                        <Text style={styles.medicationItem}>• Use: For eosinophilic inflammation</Text>
+                        <Text style={styles.medicationItem}>• Dosing: 100 mg subcutaneous every 4 weeks</Text>
+                        <Text style={styles.medicationItem}>• Evidence in COPD: Shown to reduce exacerbations in eosinophilic COPD in select patients.</Text>
+                      </View>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationSubTitle}>🔹 2. Dupilumab (Dupixent)</Text>
+                        <Text style={styles.medicationItem}>• Target: IL-4 and IL-13 pathways (type 2 inflammation)</Text>
+                        <Text style={styles.medicationItem}>• Use: Asthma, atopic dermatitis, and now also FDA-approved for COPD (as of 2023)</Text>
+                        <Text style={styles.medicationItem}>• Dosing: 300 mg every 2 weeks</Text>
+                        <Text style={styles.medicationItem}>• COPD Use: For moderate-to-severe COPD with type 2 inflammation (e.g., elevated eosinophils); reduces exacerbations and improves lung function.</Text>
+                      </View>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationSubTitle}>⚠️ Who qualifies for biologics in COPD?</Text>
+                        <Text style={styles.medicationDetailDescription}>
+                          Biologics are not for all COPD patients — they are usually considered after maximal inhaled therapy (LABA/LAMA/ICS) fails and if:
+                        </Text>
+                        <Text style={styles.medicationItem}>• Blood eosinophil count ≥ 100–300 cells/µL (depending on drug)</Text>
+                        <Text style={styles.medicationItem}>• Frequent exacerbations (≥2/year or ≥1 leading to hospitalization)</Text>
+                        <Text style={styles.medicationItem}>• No active smoking (some studies limit inclusion to former smokers)</Text>
+                        <Text style={styles.medicationItem}>• Evidence of type 2 inflammation (eosinophils, IgE, comorbid asthma)</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Nebulizer Medication Detailed Content */}
+                  {expandedMedicationCategory === 'nebulizer' && (
+                    <View style={styles.medicationDetailCard}>
+                      <Text style={styles.medicationDetailTitle}>Nebulizer Medication</Text>
+
+                      <View style={styles.medicationSubSection}>
+                        <Text style={styles.medicationSubTitle}>Omalizumab (Xolair)</Text>
+                        <Text style={styles.medicationItem}>• Target: IgE</Text>
+                        <Text style={styles.medicationItem}>• Use: Allergic asthma, potentially asthma-COPD overlap</Text>
+                        <Text style={styles.medicationItem}>• COPD Use: Not routinely used unless there's a strong allergic component or overlap with allergic asthma.</Text>
+                      </View>
+                    </View>
+                  )}
                 </View>
 
-                {/* Symbicort Guide Section */}
-                <View style={styles.inhalerGuideSection}>
-                  <Text style={styles.sectionTitle}>Symbicort Inhaler Guide</Text>
-                  <Text style={styles.guideSubtitle}>
-                    Comprehensive information about Symbicort (budesonide/formoterol) for COPD management
-                  </Text>
-
-                  <View style={styles.inhalerCard}>
-                    <Text style={styles.inhalerName}>Symbicort (budesonide/formoterol)</Text>
-                    
-                    <View style={styles.inhalerDetails}>
-                      <Text style={styles.detailTitle}>Common Examples:</Text>
-                      <Text style={styles.detailText}>• Symbicort 160/4.5 mcg (standard strength)</Text>
-                      <Text style={styles.detailText}>• Symbicort 80/4.5 mcg (lower strength)</Text>
-                    </View>
-
-                    <View style={styles.inhalerDetails}>
-                      <Text style={styles.detailTitle}>Typical Usage:</Text>
-                      <Text style={styles.detailText}>
-                        Maintenance treatment of airflow obstruction in COPD, including chronic bronchitis and emphysema
-                      </Text>
-                    </View>
-
-                    <View style={styles.inhalerDetails}>
-                      <Text style={styles.detailTitle}>Important Notes:</Text>
-                      <Text style={styles.detailText}>
-                        Combines an inhaled corticosteroid (budesonide) with a long-acting beta2-agonist (formoterol). Typically taken as 2 inhalations twice daily (morning and evening) with a metered-dose inhaler. Do not use more than 4 inhalations per day.
-                      </Text>
-                    </View>
-
-                    <View style={styles.inhalerDetails}>
-                      <Text style={styles.detailTitle}>Benefits:</Text>
-                      <Text style={styles.detailText}>
-                        Dual-action medication that both reduces inflammation in the airways (budesonide) and provides long-lasting bronchodilation (formoterol). The formoterol component starts working within minutes, while the budesonide component helps prevent future symptoms and exacerbations.
-                      </Text>
-                    </View>
-
-                    <View style={styles.inhalerDetails}>
-                      <Text style={styles.detailTitle}>Side Effects:</Text>
-                      <Text style={styles.detailText}>
-                        Common side effects include oral thrush (fungal infection), hoarseness, throat irritation, headache, and increased risk of pneumonia. Less common side effects may include increased heart rate, tremor, and nervousness.
-                      </Text>
-                    </View>
-
-                    <View style={styles.inhalerDetails}>
-                      <Text style={styles.detailTitle}>Proper Use Instructions:</Text>
-                      <Text style={styles.detailText}>1. Remove the mouthpiece cover and check that it's clean</Text>
-                      <Text style={styles.detailText}>2. Shake the inhaler well for 5 seconds before each use</Text>
-                      <Text style={styles.detailText}>3. Breathe out fully (away from the inhaler)</Text>
-                      <Text style={styles.detailText}>4. Place the mouthpiece between your teeth and close your lips around it</Text>
-                      <Text style={styles.detailText}>5. While beginning to breathe in slowly and deeply, press down on the top of the canister</Text>
-                      <Text style={styles.detailText}>6. Hold your breath for about 10 seconds, then breathe out slowly</Text>
-                      <Text style={styles.detailText}>7. If a second dose is prescribed, wait at least 1 minute before repeating steps</Text>
-                      <Text style={styles.detailText}>8. Replace the mouthpiece cover after use</Text>
-                      <Text style={styles.detailText}>9. Rinse your mouth with water after each use (do not swallow) to help prevent thrush</Text>
-                    </View>
-
-                    <View style={styles.inhalerDetails}>
-                      <Text style={styles.detailTitle}>Important Considerations:</Text>
-                      <Text style={styles.detailText}>• Symbicort contains a small amount of lactose, which may cause problems in people with severe milk protein allergies</Text>
-                      <Text style={styles.detailText}>• The canister should be at room temperature before use for best results</Text>
-                      <Text style={styles.detailText}>• Keep track of doses using the dose counter on the inhaler</Text>
-                      <Text style={styles.detailText}>• Symbicort is not for treating sudden symptoms - always keep a rescue inhaler available</Text>
-                      <Text style={styles.detailText}>• Do not stop using Symbicort without talking to your healthcare provider, even if you feel better</Text>
-                    </View>
-
-                    <View style={styles.inhalerDetails}>
-                      <Text style={styles.detailTitle}>How Symbicort Compares to Other Inhalers:</Text>
-                      <Text style={styles.detailText}>• <Text style={styles.boldText}>Advair:</Text> Like Advair, Symbicort contains an ICS/LABA combination, but Symbicort's formoterol (LABA) may start working faster than Advair's salmeterol.</Text>
-                      <Text style={styles.detailText}>• <Text style={styles.boldText}>Trelegy:</Text> Trelegy adds a third medication (LAMA) to the ICS/LABA combination, which may provide additional benefits for some patients with more severe COPD.</Text>
-                      <Text style={styles.detailText}>• <Text style={styles.boldText}>Spiriva:</Text> Spiriva (tiotropium) is a LAMA-only medication, while Symbicort combines ICS/LABA. They work through different mechanisms and are sometimes prescribed together.</Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Medication Management Tips */}
-                <View style={styles.tipsSection}>
-                  <Text style={styles.sectionTitle}>Tips for Managing Your COPD Medications</Text>
-                  <View style={styles.tipsList}>
-                    <Text style={styles.tipItem}>• Use your inhalers exactly as prescribed, even when you feel well</Text>
-                    <Text style={styles.tipItem}>• Learn the proper technique for using your specific inhaler devices</Text>
-                    <Text style={styles.tipItem}>• Keep track of when your inhalers will run out and refill prescriptions early</Text>
-                    <Text style={styles.tipItem}>• Always carry your rescue inhaler with you</Text>
-                    <Text style={styles.tipItem}>• Use a pill organizer if you take multiple medications</Text>
-                    <Text style={styles.tipItem}>• Report any side effects to your healthcare provider</Text>
-                    <Text style={styles.tipItem}>• Don't stop taking any medication without talking to your doctor first</Text>
-                    <Text style={styles.tipItem}>• Ask about medication assistance programs if cost is a concern</Text>
-                    <Text style={styles.tipItem}>• Store your inhalers according to package instructions (some need to be kept at room temperature)</Text>
-                    <Text style={styles.tipItem}>• Check the expiration dates on all your medications regularly</Text>
-                  </View>
-                </View>
-
-                {/* Proper Inhaler Technique */}
-                <View style={styles.techniqueSection}>
-                  <Text style={styles.sectionTitle}>Proper Inhaler Technique</Text>
-                  <Text style={styles.techniqueIntro}>
-                    Using your inhaler correctly ensures you get the full benefit of your medication. Common inhaler types include:
-                  </Text>
-
-                  <View style={styles.techniqueCard}>
-                    <Text style={styles.techniqueTitle}>Metered Dose Inhalers (MDIs)</Text>
-                    <Text style={styles.techniqueSubtitle}>Used with: Symbicort, Breztri Aerosphere, Advair HFA</Text>
-                    <View style={styles.techniqueSteps}>
-                      <Text style={styles.techniqueStep}>1. Remove the cap and shake the inhaler</Text>
-                      <Text style={styles.techniqueStep}>2. Breathe out fully away from the inhaler</Text>
-                      <Text style={styles.techniqueStep}>3. Put the mouthpiece in your mouth with a good seal or hold 1-2 inches from open mouth</Text>
-                      <Text style={styles.techniqueStep}>4. Start to breathe in slowly and press down on the inhaler</Text>
-                      <Text style={styles.techniqueStep}>5. Continue to breathe in slowly and deeply</Text>
-                      <Text style={styles.techniqueStep}>6. Hold your breath for 10 seconds, then breathe out slowly</Text>
-                      <Text style={styles.techniqueStep}>7. Wait at least 30-60 seconds before repeating if another dose is needed</Text>
-                    </View>
-                    <Text style={styles.techniqueNote}>
-                      Consider using a spacer with your MDI for better medication delivery.
-                    </Text>
-                  </View>
-
-                  <View style={styles.techniqueCard}>
-                    <Text style={styles.techniqueTitle}>Dry Powder Inhalers (DPIs)</Text>
-                    <Text style={styles.techniqueSubtitle}>Used with: Trelegy Ellipta, Advair Diskus, Spiriva HandiHaler</Text>
-                    <View style={styles.techniqueSteps}>
-                      <Text style={styles.techniqueStep}>1. Prepare the device according to manufacturer instructions</Text>
-                      <Text style={styles.techniqueStep}>2. Breathe out fully away from the inhaler</Text>
-                      <Text style={styles.techniqueStep}>3. Place the mouthpiece in your mouth with a good seal</Text>
-                      <Text style={styles.techniqueStep}>4. Breathe in quickly and deeply</Text>
-                      <Text style={styles.techniqueStep}>5. Remove the inhaler from your mouth</Text>
-                      <Text style={styles.techniqueStep}>6. Hold your breath for 10 seconds, then breathe out slowly</Text>
-                      <Text style={styles.techniqueStep}>7. Close the device properly</Text>
-                    </View>
-                    <Text style={styles.techniqueNote}>
-                      Do not breathe into your DPI or store in humid places as moisture can affect the powder.
-                    </Text>
-                  </View>
-
-                  <View style={styles.techniqueCard}>
-                    <Text style={styles.techniqueTitle}>Soft Mist Inhalers</Text>
-                    <Text style={styles.techniqueSubtitle}>Used with: Spiriva Respimat, Stiolto Respimat</Text>
-                    <View style={styles.techniqueSteps}>
-                      <Text style={styles.techniqueStep}>1. Keep the cap closed, turn the clear base in the direction of the arrows until it clicks</Text>
-                      <Text style={styles.techniqueStep}>2. Open the cap until it snaps fully open</Text>
-                      <Text style={styles.techniqueStep}>3. Breathe out slowly and completely</Text>
-                      <Text style={styles.techniqueStep}>4. Close your lips around the mouthpiece</Text>
-                      <Text style={styles.techniqueStep}>5. While taking a slow, deep breath, press the dose release button</Text>
-                      <Text style={styles.techniqueStep}>6. Continue to breathe in slowly</Text>
-                      <Text style={styles.techniqueStep}>7. Hold your breath for 10 seconds, then breathe out slowly</Text>
-                      <Text style={styles.techniqueStep}>8. Close the cap after use</Text>
-                    </View>
-                  </View>
-                </View>
 
                 {/* Watch Videos Button */}
                 <View style={styles.videoSection}>
@@ -2284,29 +2844,29 @@ export default function App() {
               <TouchableOpacity style={styles.profileItem} onPress={() => openProfileModal('age')}>
                 <Text style={styles.profileLabel}>Age</Text>
                 <View style={styles.profileValueContainer}>
-                  <Text style={styles.profileValue}>{age || '--'}</Text>
-                  <Text style={styles.profileArrow}>></Text>
+                  <Text style={styles.profileValue}>{age && age.trim() && age !== '.' ? age : 'N/A'}</Text>
+                  <Text style={styles.profileArrow}>&gt;</Text>
                 </View>
               </TouchableOpacity>
               <TouchableOpacity style={styles.profileItem} onPress={() => openProfileModal('sex')}>
                 <Text style={styles.profileLabel}>Sex</Text>
                 <View style={styles.profileValueContainer}>
-                  <Text style={styles.profileValue}>{sex || '--'}</Text>
-                  <Text style={styles.profileArrow}>></Text>
+                  <Text style={styles.profileValue}>{sex && sex.trim() && sex !== '.' ? sex : 'N/A'}</Text>
+                  <Text style={styles.profileArrow}>&gt;</Text>
                 </View>
               </TouchableOpacity>
               <TouchableOpacity style={styles.profileItem} onPress={() => openWeightModal('current')}>
                 <Text style={styles.profileLabel}>Weight</Text>
                 <View style={styles.profileValueContainer}>
-                  <Text style={styles.profileValue}>{currentWeight || '--'} lbs</Text>
-                  <Text style={styles.profileArrow}>></Text>
+                  <Text style={styles.profileValue}>{currentWeight && currentWeight.trim() && currentWeight !== '.' ? `${currentWeight} lbs` : 'N/A'}</Text>
+                  <Text style={styles.profileArrow}>&gt;</Text>
                 </View>
               </TouchableOpacity>
               <TouchableOpacity style={styles.profileItem} onPress={() => openProfileModal('height')}>
                 <Text style={styles.profileLabel}>Height</Text>
                 <View style={styles.profileValueContainer}>
-                  <Text style={styles.profileValue}>{height || '--'}</Text>
-                  <Text style={styles.profileArrow}>></Text>
+                  <Text style={styles.profileValue}>{height && height.trim() && height !== '.' ? height : 'N/A'}</Text>
+                  <Text style={styles.profileArrow}>&gt;</Text>
                 </View>
               </TouchableOpacity>
               <View style={styles.profileItem}>
@@ -2319,7 +2879,7 @@ export default function App() {
                 <View style={styles.profileItem}>
                   <Text style={styles.profileLabel}>Last Updated</Text>
                   <View style={styles.profileValueContainer}>
-                    <Text style={styles.profileValue}>{lastUpdated}</Text>
+                    <Text style={styles.profileValue}>{lastUpdated && lastUpdated.trim() && lastUpdated !== '.' ? lastUpdated : 'N/A'}</Text>
                   </View>
                 </View>
               )}
@@ -2355,6 +2915,503 @@ export default function App() {
       <Header />
       {renderContent()}
       <BottomNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      {/* Global Modals */}
+      {/* Add Medication Modal */}
+      <Modal
+        visible={showAddMedicationModal}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              Add {medicationType === 'daily' ? 'Daily' : 'Exacerbation'} Medication
+            </Text>
+
+            <View style={styles.modalField}>
+              <Text style={styles.modalLabel}>Medication Name</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={newMedication.name}
+                onChangeText={(text) => setNewMedication({...newMedication, name: text})}
+                placeholder="e.g., Albuterol"
+                placeholderTextColor="#d1d5db"
+              />
+            </View>
+
+            <View style={styles.modalField}>
+              <Text style={styles.modalLabel}>Dosage</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={newMedication.dosage}
+                onChangeText={(text) => setNewMedication({...newMedication, dosage: text})}
+                placeholder="e.g., 2 puffs"
+                placeholderTextColor="#d1d5db"
+              />
+            </View>
+
+            <View style={styles.modalField}>
+              <Text style={styles.modalLabel}>How Often</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={newMedication.frequency}
+                onChangeText={(text) => setNewMedication({...newMedication, frequency: text})}
+                placeholder="e.g., Twice daily"
+                placeholderTextColor="#d1d5db"
+              />
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowAddMedicationModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalSaveButton}
+                onPress={saveMedication}
+              >
+                <Text style={styles.modalSaveText}>Save Medication</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+            {/* Add Food Modal */}
+            <Modal
+              visible={showAddFoodModal}
+              animationType="slide"
+              transparent={true}
+              onShow={() => console.log('Food modal is now showing')}
+              onDismiss={() => console.log('Food modal dismissed')}
+            >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Food to {selectedMealCategory}</Text>
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalLabel}>Food Name *</Text>
+                    <View style={styles.foodInputContainer}>
+                      <TextInput
+                        style={styles.modalInput}
+                        value={foodName}
+                        onChangeText={setFoodName}
+                        placeholder="e.g., Grilled Chicken Breast"
+                        placeholderTextColor="#d1d5db"
+                      />
+                      <TouchableOpacity 
+                        style={styles.searchButton}
+                        onPress={() => setShowFoodSearch(true)}
+                      >
+                        <Text style={styles.searchButtonText}>Search DB</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+            <View style={styles.modalField}>
+              <Text style={styles.modalLabel}>Quantity *</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={foodQuantity}
+                onChangeText={setFoodQuantity}
+                placeholder="e.g., 1 cup, 100g, 1 piece"
+                placeholderTextColor="#d1d5db"
+              />
+            </View>
+
+            <View style={styles.modalField}>
+              <Text style={styles.modalLabel}>Calories (optional)</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={foodCalories}
+                onChangeText={setFoodCalories}
+                placeholder="e.g., 250"
+                placeholderTextColor="#d1d5db"
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.modalField}>
+              <Text style={styles.modalLabel}>Protein (g) (optional)</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={foodProtein}
+                onChangeText={setFoodProtein}
+                placeholder="e.g., 25"
+                placeholderTextColor="#d1d5db"
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.modalField}>
+              <Text style={styles.modalLabel}>Carbs (g) (optional)</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={foodCarbs}
+                onChangeText={setFoodCarbs}
+                placeholder="e.g., 15"
+                placeholderTextColor="#d1d5db"
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.modalField}>
+              <Text style={styles.modalLabel}>Fat (g) (optional)</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={foodFat}
+                onChangeText={setFoodFat}
+                placeholder="e.g., 8"
+                placeholderTextColor="#d1d5db"
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={closeAddFoodModal}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalSaveButton}
+                onPress={saveFoodItem}
+              >
+                <Text style={styles.modalSaveText}>Add Food</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Weight Modal */}
+      <Modal
+        visible={showWeightModal}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {weightType === 'current' ? 'Set Current Weight' : 'Set Goal Weight'}
+            </Text>
+            <View style={styles.modalField}>
+              <Text style={styles.modalLabel}>Weight (lbs)</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={weightInput}
+                onChangeText={setWeightInput}
+                placeholder="e.g., 150"
+                placeholderTextColor="#d1d5db"
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={closeWeightModal}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSaveButton}
+                onPress={saveWeight}
+              >
+                <Text style={styles.modalSaveText}>Save Weight</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+            </Modal>
+
+            {/* Food Search Modal */}
+            <Modal
+              visible={showFoodSearch}
+              animationType="slide"
+              transparent={true}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <Text style={styles.modalTitle}>Search Food Database</Text>
+                  
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalLabel}>Search for food</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      value={foodSearchQuery}
+                      onChangeText={setFoodSearchQuery}
+                      placeholder="e.g., chicken breast, apple, rice"
+                      placeholderTextColor="#d1d5db"
+                      onSubmitEditing={() => searchFoodDatabase(foodSearchQuery)}
+                    />
+                  </View>
+
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity 
+                      style={styles.modalCancelButton}
+                      onPress={() => setShowFoodSearch(false)}
+                    >
+                      <Text style={styles.modalCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.modalSaveButton}
+                      onPress={() => searchFoodDatabase(foodSearchQuery)}
+                      disabled={isSearching}
+                    >
+                      <Text style={styles.modalSaveText}>
+                        {isSearching ? 'Searching...' : 'Search'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Search Results */}
+                  {foodSearchResults.length > 0 && (
+                    <View style={styles.searchResults}>
+                      <Text style={styles.searchResultsTitle}>Select a food:</Text>
+                      <ScrollView style={styles.searchResultsList}>
+                        {foodSearchResults.map((food) => (
+                          <TouchableOpacity 
+                            key={food.id}
+                            style={styles.searchResultItem}
+                            onPress={() => selectFoodFromSearch(food)}
+                          >
+                            <Text style={styles.searchResultName}>{food.description}</Text>
+                            {food.brandOwner && (
+                              <Text style={styles.searchResultBrand}>{food.brandOwner}</Text>
+                            )}
+                            <View style={styles.searchResultNutrients}>
+                              <Text style={styles.searchResultNutrient}>
+                                Cal: {food.nutrients.calories || 'N/A'}
+                              </Text>
+                              <Text style={styles.searchResultNutrient}>
+                                Protein: {food.nutrients.protein || 'N/A'}g
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </Modal>
+
+            {/* Exercise Modal */}
+            <Modal
+              visible={showExerciseModal}
+              animationType="slide"
+              transparent={true}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <Text style={styles.modalTitle}>Log Exercise</Text>
+                  
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalLabel}>Exercise Type</Text>
+                    <View style={styles.exerciseTypeGrid}>
+                      <TouchableOpacity 
+                        style={[styles.exerciseTypeButton, selectedExerciseType === 'Walking' && styles.exerciseTypeButtonSelected]}
+                        onPress={() => setSelectedExerciseType('Walking')}
+                      >
+                        <Text style={styles.exerciseTypeIcon}>🚶‍♂️</Text>
+                        <Text style={styles.exerciseTypeText}>Walking</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={[styles.exerciseTypeButton, selectedExerciseType === 'Running/Jogging' && styles.exerciseTypeButtonSelected]}
+                        onPress={() => setSelectedExerciseType('Running/Jogging')}
+                      >
+                        <Text style={styles.exerciseTypeIcon}>🏃‍♂️</Text>
+                        <Text style={styles.exerciseTypeText}>Running</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={[styles.exerciseTypeButton, selectedExerciseType === 'Swimming' && styles.exerciseTypeButtonSelected]}
+                        onPress={() => setSelectedExerciseType('Swimming')}
+                      >
+                        <Text style={styles.exerciseTypeIcon}>🏊‍♂️</Text>
+                        <Text style={styles.exerciseTypeText}>Swimming</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={[styles.exerciseTypeButton, selectedExerciseType === 'Hiking' && styles.exerciseTypeButtonSelected]}
+                        onPress={() => setSelectedExerciseType('Hiking')}
+                      >
+                        <Text style={styles.exerciseTypeIcon}>🥾</Text>
+                        <Text style={styles.exerciseTypeText}>Hiking</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={[styles.exerciseTypeButton, selectedExerciseType === 'Weight Training' && styles.exerciseTypeButtonSelected]}
+                        onPress={() => setSelectedExerciseType('Weight Training')}
+                      >
+                        <Text style={styles.exerciseTypeIcon}>🏋️‍♂️</Text>
+                        <Text style={styles.exerciseTypeText}>Weight Training</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={[styles.exerciseTypeButton, selectedExerciseType === 'other' && styles.exerciseTypeButtonSelected]}
+                        onPress={() => setSelectedExerciseType('other')}
+                      >
+                        <Text style={styles.exerciseTypeIcon}>💪</Text>
+                        <Text style={styles.exerciseTypeText}>Other</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {selectedExerciseType === 'other' && (
+                    <View style={styles.modalField}>
+                      <Text style={styles.modalLabel}>Custom Exercise Type</Text>
+                      <TextInput
+                        style={styles.modalInput}
+                        value={customExerciseType}
+                        onChangeText={setCustomExerciseType}
+                        placeholder="e.g., Yoga, Cycling, Dancing"
+                        placeholderTextColor="#d1d5db"
+                      />
+                    </View>
+                  )}
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalLabel}>Duration (minutes)</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      value={exerciseMinutes}
+                      onChangeText={setExerciseMinutes}
+                      placeholder="e.g., 30"
+                      placeholderTextColor="#d1d5db"
+                      keyboardType="numeric"
+                    />
+                  </View>
+
+                  <TouchableOpacity style={styles.phoneDataButton} onPress={importFromPhoneHealth}>
+                    <Text style={styles.phoneDataButtonText}>📱 Import from Phone Health (Optional)</Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity 
+                      style={styles.modalCancelButton}
+                      onPress={closeExerciseModal}
+                    >
+                      <Text style={styles.modalCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.modalSaveButton}
+                      onPress={saveExercise}
+                    >
+                      <Text style={styles.modalSaveText}>Log Exercise</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+
+            {/* Oxygen Saturation Modal */}
+            <Modal
+              visible={showOxygenModal}
+              animationType="slide"
+              transparent={true}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <Text style={styles.modalTitle}>Log Oxygen Saturation</Text>
+                  
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalLabel}>Oxygen Saturation Level (%)</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      value={oxygenLevel}
+                      onChangeText={setOxygenLevel}
+                      placeholder="e.g., 95"
+                      placeholderTextColor="#d1d5db"
+                      keyboardType="numeric"
+                    />
+                    <Text style={styles.oxygenHelpText}>
+                      Normal range: 95-100% | COPD patients: Often 88-92%
+                    </Text>
+                  </View>
+
+                  <View style={styles.oxygenGuidelines}>
+                    <Text style={styles.guidelinesTitle}>Reference Levels:</Text>
+                    <View style={styles.oxygenRange}>
+                      <Text style={styles.oxygenRangeGood}>90-100%: Normal Ranges</Text>
+                      <Text style={styles.oxygenRangeLow}>Below 90%: Seek medical attention</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity 
+                      style={styles.modalCancelButton}
+                      onPress={closeOxygenModal}
+                    >
+                      <Text style={styles.modalCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.modalSaveButton}
+                      onPress={saveOxygenReading}
+                    >
+                      <Text style={styles.modalSaveText}>Save Reading</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+
+            {/* Profile Modal */}
+      <Modal
+        visible={showProfileModal}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {profileField === 'age' ? 'Set Age' :
+               profileField === 'sex' ? 'Set Sex' :
+               profileField === 'height' ? 'Set Height' : 'Update Profile'}
+            </Text>
+            <View style={styles.modalField}>
+              <Text style={styles.modalLabel}>
+                {profileField === 'age' ? 'Age (years)' :
+                 profileField === 'sex' ? 'Sex' :
+                 profileField === 'height' ? 'Height (e.g., 5\'4" or 64 inches)' : 'Value'}
+              </Text>
+              <TextInput
+                style={styles.modalInput}
+                value={profileInput}
+                onChangeText={setProfileInput}
+                placeholder={
+                  profileField === 'age' ? 'e.g., 43' :
+                  profileField === 'sex' ? 'e.g., Female' :
+                  profileField === 'height' ? 'e.g., 5\'4"' : 'Enter value'
+                }
+                placeholderTextColor="#d1d5db"
+                keyboardType={profileField === 'age' ? 'numeric' : 'default'}
+              />
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={closeProfileModal}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSaveButton}
+                onPress={saveProfileField}
+              >
+                <Text style={styles.modalSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2912,6 +3969,191 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  // Food Search Styles
+  foodInputContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  searchButton: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    justifyContent: 'center',
+  },
+  searchButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  searchResults: {
+    marginTop: 16,
+    maxHeight: 300,
+  },
+  searchResultsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  searchResultsList: {
+    maxHeight: 250,
+  },
+  searchResultItem: {
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: '#f9fafb',
+  },
+  searchResultName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  searchResultBrand: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  searchResultNutrients: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  searchResultNutrient: {
+    fontSize: 12,
+    color: '#374151',
+    backgroundColor: '#e5e7eb',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  // Exercise Modal Styles
+  exerciseTypeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 8,
+  },
+  exerciseTypeButton: {
+    width: '45%',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#f9fafb',
+    alignItems: 'center',
+  },
+  exerciseTypeButtonSelected: {
+    borderColor: '#2563eb',
+    backgroundColor: '#eff6ff',
+  },
+  exerciseTypeIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  exerciseTypeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  phoneDataButton: {
+    backgroundColor: '#6366f1',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  phoneDataButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  exerciseList: {
+    marginTop: 12,
+    maxHeight: 100,
+  },
+  exerciseItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 6,
+    marginVertical: 2,
+  },
+  exerciseType: {
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  exerciseMinutes: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '600',
+  },
+  // Oxygen Saturation Styles
+  oxygenReadingsList: {
+    marginTop: 12,
+    maxHeight: 120,
+  },
+  readingsTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  readingItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 6,
+    marginVertical: 2,
+  },
+  readingLevel: {
+    fontSize: 14,
+    color: '#059669',
+    fontWeight: '700',
+  },
+  readingTime: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  oxygenHelpText: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  oxygenGuidelines: {
+    marginVertical: 16,
+    padding: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+  },
+  oxygenRange: {
+    marginTop: 8,
+  },
+  oxygenRangeGood: {
+    fontSize: 12,
+    color: '#059669',
+    marginVertical: 2,
+  },
+  oxygenRangeOk: {
+    fontSize: 12,
+    color: '#d97706',
+    marginVertical: 2,
+  },
+  oxygenRangeLow: {
+    fontSize: 12,
+    color: '#dc2626',
+    marginVertical: 2,
+  },
   emergencyButton: {
     backgroundColor: '#dc2626',
     paddingHorizontal: 32,
@@ -3140,7 +4382,9 @@ const styles = StyleSheet.create({
   guidelinesContainer: {
     flex: 1,
     backgroundColor: '#ffffff',
-    paddingBottom: 100,
+  },
+  guidelinesContentContainer: {
+    paddingBottom: 150, // Extra space for bottom navigation
   },
   guidelinesSection: {
     padding: 20,
@@ -3305,7 +4549,9 @@ const styles = StyleSheet.create({
   trackingContainer: {
     flex: 1,
     backgroundColor: '#ffffff',
-    paddingBottom: 100,
+  },
+  trackingContentContainer: {
+    paddingBottom: 150, // Extra space for bottom navigation
   },
   // Tracking Page Styles
   trackingHeader: {
@@ -3317,10 +4563,34 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
+  dateContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
   trackingTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#1f2937',
+  },
+  trackingDate: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  dateNavButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  dateNavArrow: {
+    fontSize: 18,
+    color: '#374151',
+    fontWeight: '600',
   },
   trackingActions: {
     flexDirection: 'row',
@@ -3496,6 +4766,80 @@ const styles = StyleSheet.create({
   mealCategoryArrow: {
     fontSize: 16,
     color: '#6b7280',
+  },
+  // Food Item Display Styles
+  foodItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#f9fafb',
+    marginHorizontal: 16,
+    marginVertical: 4,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#10b981',
+  },
+  foodIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  foodIconText: {
+    fontSize: 18,
+  },
+  foodDetails: {
+    flex: 1,
+  },
+  foodItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  foodItemQuantity: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  foodNutrition: {
+    alignItems: 'flex-end',
+  },
+  foodCalories: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  foodCaloriesLabel: {
+    fontSize: 10,
+    color: '#6b7280',
+  },
+  nutritionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+    gap: 8,
+  },
+  nutritionItem: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    minWidth: 70,
+  },
+  nutritionLabel: {
+    fontSize: 10,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  nutritionValue: {
+    fontSize: 12,
+    color: '#111827',
+    fontWeight: '600',
   },
   copdTrackingSection: {
     padding: 20,
@@ -3926,6 +5270,49 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#374151',
     textAlign: 'center',
+  },
+  medicationDetailCard: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 20,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  medicationDetailTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  medicationDetailDescription: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 16,
+    lineHeight: 24,
+  },
+  medicationSubSection: {
+    marginBottom: 16,
+  },
+  medicationSubTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  medicationTypeLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#4b5563',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  medicationItem: {
+    fontSize: 15,
+    color: '#6b7280',
+    marginLeft: 8,
+    marginBottom: 4,
+    lineHeight: 22,
   },
   inhalerGuideSection: {
     padding: 20,

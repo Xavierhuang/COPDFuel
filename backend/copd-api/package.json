@@ -1,0 +1,11 @@
+{
+  "name": "copd-api",
+  "version": "1.0.0",
+  "description": "COPD Health Tracker API Lambda",
+  "type": "module",
+  "main": "index.mjs",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0"
+  }
+}

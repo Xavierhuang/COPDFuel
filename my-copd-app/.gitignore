@@ -36,4 +36,22 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Build artifacts
+android/build/
+android/app/build/
+android/.gradle/
+*.apk
+*.aab
+*.ipa
+
+# Temporary files
+temp-project/
+*.tmp
+*.temp
+
+# Large data files
+assets/foodData.db
+scripts/foodDataAnalysis.json
+Ingenious Medical Solutions*/
+
 app-example

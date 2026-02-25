@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- DNA helix icon for PDE4 inhibitors - pink/magenta -->
+    <path
+        android:fillColor="#ec407a"
+        android:pathData="M4,2h2v2H4V2zM2,7h2v2H2V7zM2,17h2v2H2V17zM4,22h2v-2H4V22zM18,2h2v2h-2V2zM20,7h2v2h-2V7zM20,17h2v2h-2V17zM18,22h2v-2h-2V22zM7.5,6.5h9v2h-9V6.5zM7.5,15.5h9v2h-9V15.5zM7.5,11h9v2h-9V11z"/>
+</vector>

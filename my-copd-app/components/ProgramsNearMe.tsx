@@ -115,7 +115,7 @@ export function ProgramsNearMe() {
   const [manualLocation, setManualLocation] = useState('');
 
   // Google Places API Key - In production, this should be stored securely
-  const GOOGLE_PLACES_API_KEY = 'AIzaSyAmPDQRIj98i30GKdkYV9oLtHOnpoMQOfU'; // Replace with your actual API key
+  const GOOGLE_PLACES_API_KEY = '[REDACTED_GOOGLE_PLACES_KEY]';
 
   useEffect(() => {
     requestLocationPermission();
