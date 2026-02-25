@@ -11,7 +11,7 @@ Publish the final version on a webpage (e.g. your website or a static page) and 
 
 ### 1. Who we are
 
-[Your company or app name], operating the COPD Health Tracker application ("we," "our," or "us").
+[Your company or app name], operating the COPD Fuel application ("we," "our," or "us").
 
 ### 2. What we collect
 
@@ -20,7 +20,7 @@ Publish the final version on a webpage (e.g. your website or a static page) and 
 
 ### 3. How we use your information
 
-- To provide the COPD Health Tracker app and its features.
+- To provide the COPD Fuel app and its features.
 - When you choose to link your account to a healthcare provider (e.g. your doctor or practice), we share your health data you have agreed to share with that provider for your care. We do this only after you give explicit consent in the app.
 
 ### 4. Where your data is stored

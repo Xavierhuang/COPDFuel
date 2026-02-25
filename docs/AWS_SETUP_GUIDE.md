@@ -1,4 +1,4 @@
-# AWS Setup Guide – COPD Health Tracker
+# AWS Setup Guide – COPD Fuel
 
 Step-by-step setup for the doctor-pilot backend. Do these in order.
 
@@ -103,7 +103,7 @@ Create an **App client** for the mobile app:
 
 You’ll use User pool ID + Client ID in the Android and iOS apps.
 
-**Your COPD Health Tracker credentials (save these):**
+**Your COPD Fuel credentials (save these):**
 
 | Item | Value |
 |------|--------|

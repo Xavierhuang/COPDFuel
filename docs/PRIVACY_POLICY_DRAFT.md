@@ -17,7 +17,7 @@ We respect your privacy and are committed to protecting your personal and health
 
 ### 1. Who we are
 
-Ingenious Medical Solutions, LLC, operating the COPD Health Tracker application ("we," "our," or "us").
+Ingenious Medical Solutions, LLC, operating the COPD Fuel application ("we," "our," or "us").
 
 ### 2. What we collect (including PHI)
 
@@ -29,7 +29,7 @@ Ingenious Medical Solutions, LLC, operating the COPD Health Tracker application 
 
 ### 3. How we use your information
 
-- To provide the COPD Health Tracker app and its features and personalized insights.
+- To provide the COPD Fuel app and its features and personalized insights.
 - To improve app performance and your experience.
 - When you choose to link your account to a healthcare provider (e.g. your doctor or practice), we share the health data you have agreed to share with that provider for your care. We do this only after you give explicit consent in the app.
 

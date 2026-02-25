@@ -14,6 +14,18 @@
   <string name="hipaa_revoke">Revoke authorization</string>
   <string name="hipaa_revoke_confirm">Revoke your HIPAA authorization? You can sign again later if needed.</string>
   <string name="hipaa_consent_required">You must complete the HIPAA Authorization before linking to a doctor.</string>
+  <string name="health_info_consent_title">Health Information Consent</string>
+  <string name="health_info_consent_body">By signing, you allow COPD Fuel, owned by Ingenious Medical Solutions, LLC, to share your medical records with the person or organization you choose.\n\nWhat information is shared?\n\nYour complete medical record.\n\nAny other specific health details you choose to list.\n\nWhy is it being shared?\n\nTo help with your medical treatment.\n\nBecause you requested it.\n\nImportant Things to Know:\n\nIt\'s Voluntary: You do not have to sign this to receive medical care.\n\nYou Can Change Your Mind: You can cancel this permission in writing at any time.\n\nExpiration: This permission will end on the date you select below (or until you withdraw).\n\nPrivacy Note: Once your records are shared, they may no longer be protected by federal privacy rules.</string>
+  <string name="health_info_consent_name_hint">Patient Signature (full name)</string>
+  <string name="health_info_consent_dob_hint">Date of Birth</string>
+  <string name="health_info_consent_expires">Expires:</string>
+  <string name="health_info_consent_expires_1year">1 Year from Today</string>
+  <string name="health_info_consent_expires_on">On</string>
+  <string name="health_info_consent_expires_until">Until Withdrawn</string>
+  <string name="health_info_consent_confirm">By tapping \"Agree &amp; Sign\", I confirm I am the patient and that the date below is correct.</string>
+  <string name="health_info_consent_agree_sign">Agree &amp; Sign</string>
+  <string name="health_info_consent_dob_required">Date of birth is required.</string>
+  <string name="health_info_consent_expiry_date_required">Please enter an expiry date.</string>
   <string name="expo_system_ui_user_interface_style" translatable="false">automatic</string>
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>

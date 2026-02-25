@@ -1,4 +1,4 @@
-# COPD Health Tracker – AWS Backend Architecture
+# COPD Fuel – AWS Backend Architecture
 
 Recommended backend for the doctor pilot: **AWS**, with HIPAA-eligible services and a single BAA.
 

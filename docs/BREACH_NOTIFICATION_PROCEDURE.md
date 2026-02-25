@@ -6,8 +6,10 @@
 
 ## 1. Roles
 
-- **Privacy/Security contact:** [Name or role, e.g. "CTO" or "Privacy Officer"] – Responsible for assessing incidents and deciding whether a breach occurred and for coordinating notification.
-- **Technical contact:** [Name or role] – Can investigate logs, access, and data exposure.
+- **Privacy/Security contact:** Xavier Huang (support@COPDFuel.com) – Responsible for assessing incidents and deciding whether a breach occurred and for coordinating notification. Primary contact for affected individuals and practices.
+- **Technical contact:** Xavier Huang (support@COPDFuel.com) – Can investigate logs, access, and data exposure; supports containment and scope assessment.
+
+Fill in the names above and keep this document in a place your team can access. Train anyone who might handle an incident to read this and know who to call (Privacy/Security contact first).
 
 ---
 
@@ -36,7 +38,7 @@ Trigger when:
 
 If it is a breach of **unsecured** PHI:
 
-- **Affected individuals:** Notify each affected individual without unreasonable delay (HIPAA: generally within 60 days). Include: what happened, what data was involved, what they should do (e.g. monitor, change password), your contact for questions. Method: [e.g. email or first-class mail].
+- **Affected individuals:** Notify each affected individual without unreasonable delay (HIPAA: generally within 60 days). Include: what happened, what data was involved, what they should do (e.g. monitor, change password), your contact for questions. Method: email or first-class mail (use the same method you use for other patient communications, or as legal counsel advises).
 - **Covered entity (practice):** Notify each affected practice’s privacy/security contact as required by your BAA (often same 60-day standard). Provide enough detail for them to meet their own notification obligations.
 - **HHS:** If 500+ individuals are affected, notify HHS (OCR) in the same time frame. If fewer, document and report annually if required. Consult legal counsel for exact requirements.
 - **Media/state:** Consult legal counsel for any media or state-agency notification requirements (e.g. for large breaches).
@@ -54,8 +56,8 @@ Keep a secure list (e.g. encrypted or access-controlled) of each pilot practice�
 
 | Practice name | Privacy/Security contact | Email | Phone |
 |---------------|---------------------------|-------|--------|
-| [Practice 1]  | [Name]                    | [ ]   | [ ]    |
-| [Practice 2]  | [Name]                    | [ ]   | [ ]    |
+| [Practice name] | [Contact name, title] | [Email] | [Phone] |
+| [Add more rows as you onboard practices] | | | |
 
 Update when practices are added or contacts change.
 
@@ -63,7 +65,13 @@ Update when practices are added or contacts change.
 
 ## 5. Escalation
 
-If the incident is serious (e.g. large number of records, ransomware, ongoing access), involve [e.g. legal counsel, cyber insurance] immediately.
+If the incident is serious (e.g. large number of records, ransomware, ongoing access), involve legal counsel and cyber insurance (if you have it) immediately.
+
+---
+
+## 6. Do we submit this document to anyone?
+
+**No.** This is an **internal** procedure. You do not file it with HHS, OCR, or any regulator. You keep it on file and **follow it** when a suspected breach occurs. If HHS or a practice asks how you handle breaches, you can provide a summary or this procedure; there is no requirement to "submit" it proactively. HIPAA requires you to **notify** affected individuals and (as applicable) covered entities and HHS when a breach occurs—not to submit your procedure in advance.
 
 ---
 

@@ -20,8 +20,8 @@
 
 ## 2. How users can request deletion
 
-- **In the privacy policy:** State that users can request deletion by contacting [your email] or [in-app "Delete my account" if you add it].
-- **Process:** When you receive a request:
+- **In the privacy policy:** Users can request deletion by contacting **support@copdfuel.com** or via in-app "Delete my account" (if implemented).
+- **Process:** When you receive a request, follow **docs/ACCOUNT_DELETION_PROCESS.md**. Summary:
   1. Confirm the requester’s identity (e.g. same email as account, or secure link).
   2. Run the deletion process (see below).
   3. Confirm in writing that the account and associated data have been deleted (or what was retained and why).
@@ -44,10 +44,7 @@ You need to remove the user’s data from:
 **Options:**
 
 - **Manual (pilot):** Use AWS Console or a one-off script: look up the user by email in Cognito to get `userId` (sub), then delete from Cognito and from each DynamoDB table as above. Document the steps so anyone authorized can run them.
-- **API (recommended for scale):** Add an endpoint (e.g. **DELETE /me** or **POST /account/delete**) that:
-  - Requires a valid JWT.
-  - Deletes the caller’s data from all tables and then deletes the user from Cognito (using Cognito AdminDeleteUser).  
-  Call it only after the user confirms (e.g. in-app "Delete my account" with a second confirmation). Restrict this endpoint to the account owner (JWT sub = userId).
+- **API (recommended for scale):** A **DELETE /me** endpoint is available: it requires a valid JWT, deletes the caller's data from all DynamoDB tables, and can delete the user from Cognito if the Lambda is configured with `COGNITO_USER_POOL_ID` and the role has `cognito-idp:AdminDeleteUser`. Call it only after the user confirms (e.g. in-app "Delete my account" with a second confirmation). See **docs/ACCOUNT_DELETION_PROCESS.md** for manual steps when processing email requests.
 
 ---
 

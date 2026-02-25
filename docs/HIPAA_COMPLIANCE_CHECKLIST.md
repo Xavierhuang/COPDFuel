@@ -1,4 +1,4 @@
-# HIPAA Compliance Checklist – COPD Health Tracker (Doctor Pilot)
+# HIPAA Compliance Checklist – COPD Fuel (Doctor Pilot)
 
 Use this checklist to stay compliant when you operate as a **business associate** for the doctor pilot. Have a healthcare attorney review before going live.
 
@@ -48,7 +48,7 @@ Use this checklist to stay compliant when you operate as a **business associate*
 
 ## 4. In-App and In-Portal Behavior
 
-- [ ] **Consent before sharing** – Before a patient links to a doctor, the app must show clear consent: e.g. “I agree to share my COPD Health Tracker data with [Practice name]. I have read the Privacy Policy.” Record consent (e.g. via `POST /consent`) with a timestamp before completing `POST /link-doctor`.
+- [ ] **Consent before sharing** – Before a patient links to a doctor, the app must show clear consent: e.g. “I agree to share my COPD Fuel data with [Practice name]. I have read the Privacy Policy.” Record consent (e.g. via `POST /consent`) with a timestamp before completing `POST /link-doctor`.
 - [ ] **Disclosure** – Users should be told in the app that when they sign in and link to a doctor, their health data is stored in the cloud and shared with that practice.
 - [ ] **Secure auth** – Passwords and sessions via Cognito; JWT in `Authorization` header only; no PHI in URLs or query params.
 
@@ -81,7 +81,7 @@ Use this checklist to stay compliant when you operate as a **business associate*
 
 ## Privacy Policy Outline (for your lawyer to finalize)
 
-- **Who we are** – COPD Health Tracker / [Your entity name].
+- **Who we are** – COPD Fuel / [Your entity name].
 - **What we collect** – Account info (email, password via Cognito); health data you enter (weight, medications, oxygen, exercise, food, hydration, etc.).
 - **How we use it** – To provide the app and, if you link to a doctor, to share your data with that practice for your care.
 - **Where it is stored** – Securely on AWS (encryption in transit and at rest).

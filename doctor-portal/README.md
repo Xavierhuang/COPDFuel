@@ -1,4 +1,4 @@
-# COPD Health Tracker – Doctor Portal
+# COPD Fuel – Doctor Portal
 
 Web app for doctors to view linked patients and their health overview. Uses the same Cognito user pool as the mobile apps; doctor accounts must have `custom:role` = `doctor` (set in Cognito or via PUT /me after first sign-in).
 

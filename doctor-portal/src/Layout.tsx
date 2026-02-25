@@ -10,7 +10,7 @@ export default function Layout({ onSignOut }: LayoutProps) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <header style={{ background: '#1a1a1a', color: '#fff', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <a href="/" style={{ color: '#fff', fontWeight: 600 }}>COPD Health Tracker - Doctor Portal</a>
+        <a href="/" style={{ color: '#fff', fontWeight: 600 }}>COPD Fuel - Doctor Portal</a>
         <button type="button" onClick={onSignOut} style={{ background: 'transparent', color: '#fff', border: '1px solid #666', padding: '0.4rem 0.8rem', cursor: 'pointer', borderRadius: 4 }}>Sign out</button>
       </header>
       <main style={{ flex: 1, padding: '1.5rem' }}>
@@ -20,7 +20,7 @@ export default function Layout({ onSignOut }: LayoutProps) {
         {config.privacyPolicyUrl ? (
           <a href={config.privacyPolicyUrl} target="_blank" rel="noopener noreferrer">Privacy Policy</a>
         ) : (
-          <span>COPD Health Tracker Doctor Portal. Set VITE_PRIVACY_POLICY_URL to link your privacy policy.</span>
+          <span>COPD Fuel Doctor Portal. Set VITE_PRIVACY_POLICY_URL to link your privacy policy.</span>
         )}
       </footer>
     </div>

@@ -1,6 +1,6 @@
 /**
- * COPD Health Tracker API – single Lambda handler for HTTP API (API Gateway v2).
- * Routes: GET /, GET /me, POST /sync, POST /consent, POST /link-doctor, GET /patients, GET /patients/:patientId/overview.
+ * COPD Fuel API – single Lambda handler for HTTP API (API Gateway v2).
+ * Routes: GET /, GET /me, PUT /me, POST /sync, POST /consent, POST /link-doctor, DELETE /me, GET /patients, GET /patients/:patientId/overview.
  * Set env: USERS_TABLE, PRACTICES_TABLE, LINKS_TABLE, CONSENTS_TABLE, HEALTH_DATA_TABLE.
  */
 
@@ -11,6 +11,7 @@ import {
   PutCommand,
   QueryCommand,
   ScanCommand,
+  DeleteCommand,
 } from '@aws-sdk/lib-dynamodb';
 
 const client = new DynamoDBClient({});
@@ -95,6 +96,53 @@ export const handler = async (event) => {
         },
       }));
       return json(200, { ok: true, userId });
+    }
+
+    if (route === 'DELETE /me') {
+      const userId = getUserId(event);
+      if (!userId) return json(401, { error: 'Unauthorized' });
+      await doc.send(new DeleteCommand({ TableName: USERS_TABLE, Key: { userId } }));
+      const consents = await doc.send(new QueryCommand({
+        TableName: CONSENTS_TABLE,
+        KeyConditionExpression: 'patientId = :pid',
+        ExpressionAttributeValues: { ':pid': userId },
+      })).then(r => r.Items || []);
+      for (const c of consents) {
+        await doc.send(new DeleteCommand({
+          TableName: CONSENTS_TABLE,
+          Key: { patientId: c.patientId, consentedAt: c.consentedAt },
+        }));
+      }
+      const links = await doc.send(new QueryCommand({
+        TableName: LINKS_TABLE,
+        KeyConditionExpression: 'patientId = :pid',
+        ExpressionAttributeValues: { ':pid': userId },
+      })).then(r => r.Items || []);
+      for (const l of links) {
+        await doc.send(new DeleteCommand({
+          TableName: LINKS_TABLE,
+          Key: { patientId: l.patientId, doctorId: l.doctorId },
+        }));
+      }
+      let lastKey;
+      do {
+        const healthResult = await doc.send(new QueryCommand({
+          TableName: HEALTH_DATA_TABLE,
+          KeyConditionExpression: 'patientId = :pid',
+          ExpressionAttributeValues: { ':pid': userId },
+          Limit: 100,
+          ...(lastKey && { ExclusiveStartKey: lastKey }),
+        }));
+        const items = healthResult.Items || [];
+        for (const h of items) {
+          await doc.send(new DeleteCommand({
+            TableName: HEALTH_DATA_TABLE,
+            Key: { patientId: h.patientId, sk: h.sk },
+          }));
+        }
+        lastKey = healthResult.LastEvaluatedKey;
+      } while (lastKey);
+      return json(200, { deleted: true });
     }
 
     if (route === 'GET /me') {

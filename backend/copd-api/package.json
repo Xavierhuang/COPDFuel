@@ -1,7 +1,7 @@
 {
   "name": "copd-api",
   "version": "1.0.0",
-  "description": "COPD Health Tracker API Lambda",
+  "description": "COPD Fuel API Lambda",
   "type": "module",
   "main": "index.mjs",
   "dependencies": {

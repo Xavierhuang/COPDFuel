@@ -59,6 +59,7 @@ class ProfileFragment : Fragment() {
         setupHipaaAuthorization()
         setupLinkDoctor()
         setupSignOut()
+        setupDeleteAccount()
         setupPrivacyPolicy()
         updateHipaaStatus()
     }
@@ -104,6 +105,45 @@ class ProfileFragment : Fragment() {
             (requireActivity().application as AppApplication).copdAuth.signOut()
             startActivity(android.content.Intent(requireContext(), com.copdhealthtracker.LoginActivity::class.java))
             requireActivity().finish()
+        }
+    }
+
+    private fun setupDeleteAccount() {
+        binding.btnDeleteAccount.setOnClickListener {
+            AlertDialog.Builder(requireContext())
+                .setTitle("Delete my account")
+                .setMessage("This will permanently delete your account and all health data from our servers. You can also request deletion by emailing support@copdfuel.com. Are you sure?")
+                .setPositiveButton("Delete account") { _, _ ->
+                    performDeleteAccount()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+    }
+
+    private fun performDeleteAccount() {
+        val app = requireActivity().application as AppApplication
+        app.copdAuth.getIdToken { tokenResult ->
+            val token = tokenResult.getOrNull()
+            if (token == null) {
+                Toast.makeText(requireContext(), "Please sign in first", Toast.LENGTH_SHORT).show()
+                return@getIdToken
+            }
+            binding.btnDeleteAccount.isEnabled = false
+            app.apiClient.deleteMe(token) { result ->
+                binding.btnDeleteAccount.isEnabled = true
+                result.fold(
+                    onSuccess = {
+                        app.copdAuth.signOut()
+                        startActivity(Intent(requireContext(), com.copdhealthtracker.LoginActivity::class.java))
+                        requireActivity().finish()
+                        Toast.makeText(requireContext(), "Account deleted", Toast.LENGTH_SHORT).show()
+                    },
+                    onFailure = { e ->
+                        Toast.makeText(requireContext(), e.message ?: "Delete failed", Toast.LENGTH_LONG).show()
+                    }
+                )
+            }
         }
     }
 
@@ -175,7 +215,7 @@ class ProfileFragment : Fragment() {
                 val report = reportGenerator.generateFullReport()
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "message/rfc822"
-                    putExtra(Intent.EXTRA_SUBJECT, "COPD Health Tracker Report - ${SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())}")
+                    putExtra(Intent.EXTRA_SUBJECT, "COPD Fuel Report - ${SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())}")
                     putExtra(Intent.EXTRA_TEXT, report)
                 }
                 try {
@@ -215,7 +255,7 @@ class ProfileFragment : Fragment() {
                 val report = reportGenerator.generateFullReport()
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
-                    putExtra(Intent.EXTRA_SUBJECT, "COPD Health Tracker Report - ${SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())}")
+                    putExtra(Intent.EXTRA_SUBJECT, "COPD Fuel Report - ${SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())}")
                     putExtra(Intent.EXTRA_TEXT, report)
                 }
                 startActivity(Intent.createChooser(intent, "Share Report"))

@@ -1157,6 +1157,17 @@
             android:text="Sign out"
             android:backgroundTint="@color/textSecondary" />
 
+        <!-- Delete my account -->
+        <Button
+            android:id="@+id/btn_delete_account"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginBottom="20dp"
+            android:text="Delete my account"
+            android:backgroundTint="@color/colorError" />
+
     </LinearLayout>
 
 </ScrollView>

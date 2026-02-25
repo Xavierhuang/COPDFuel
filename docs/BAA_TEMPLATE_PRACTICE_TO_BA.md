@@ -1,6 +1,6 @@
 # Business Associate Agreement – Draft Template
 
-**Use:** Between a **Covered Entity** (the medical practice) and a **Business Associate** (the entity operating the COPD Health Tracker app that will receive or process the practice’s patients’ PHI).  
+**Use:** Between a **Covered Entity** (the medical practice) and a **Business Associate** (the entity operating the COPD Fuel app that will receive or process the practice’s patients’ PHI).  
 **Important:** This is a draft template only. Have a healthcare attorney review and customize before use. Laws and requirements vary by state and situation.
 
 ---
@@ -23,7 +23,7 @@ This Business Associate Agreement (“Agreement”) is entered into as of **[EFF
 
 A. Covered Entity provides healthcare services and creates, receives, or maintains Protected Health Information (“PHI”) as defined in the Health Insurance Portability and Accountability Act of 1996 and its implementing regulations (“HIPAA”).
 
-B. Business Associate operates the COPD Health Tracker application and related services through which patients of Covered Entity may choose to share health information with Covered Entity.
+B. Business Associate operates the COPD Fuel application and related services through which patients of Covered Entity may choose to share health information with Covered Entity.
 
 C. In connection with those services, Business Associate may create, receive, maintain, or transmit PHI on behalf of Covered Entity, making Business Associate a “business associate” under HIPAA.
 
@@ -45,7 +45,7 @@ Terms used but not defined here have the meanings given in the HIPAA Privacy Rul
 
 2.2 Business Associate shall not use or disclose PHI for marketing, advertising, or sale; or for any purpose other than as set forth in this Agreement or as required by law.
 
-2.3 The services covered by this Agreement are: operation of the COPD Health Tracker application, including storage and transmission of health data that patients have consented to share with Covered Entity, and making that data available to authorized users of Covered Entity as designated through the application.
+2.3 The services covered by this Agreement are: operation of the COPD Fuel application, including storage and transmission of health data that patients have consented to share with Covered Entity, and making that data available to authorized users of Covered Entity as designated through the application.
 
 ---
 

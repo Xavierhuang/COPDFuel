@@ -30,7 +30,28 @@
             android:textSize="14sp"
             android:textColor="?android:attr/textColorPrimary"
             android:lineSpacingMultiplier="1.2"
-            android:layout_marginBottom="20dp" />
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:id="@+id/health_info_consent_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/health_info_consent_title"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="?attr/colorPrimary"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
+            android:id="@+id/health_info_consent_body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/health_info_consent_body"
+            android:textSize="14sp"
+            android:textColor="?android:attr/textColorPrimary"
+            android:lineSpacingMultiplier="1.2"
+            android:layout_marginBottom="16dp" />
 
         <CheckBox
             android:id="@+id/hipaa_agree"
@@ -38,14 +59,14 @@
             android:layout_height="wrap_content"
             android:text="@string/hipaa_i_agree"
             android:textSize="14sp"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="12dp" />
 
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/hipaa_printed_name_layout"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="@string/hipaa_printed_name_hint"
+            android:hint="@string/health_info_consent_name_hint"
             app:boxStrokeColor="?attr/colorPrimary">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -55,6 +76,87 @@
                 android:inputType="textPersonName"
                 android:maxLines="1" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/hipaa_dob_layout"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/health_info_consent_dob_hint"
+            app:boxStrokeColor="?attr/colorPrimary"
+            android:layout_marginTop="12dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/hipaa_dob"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="none"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:maxLines="1" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
+            android:id="@+id/health_info_expires_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/health_info_consent_expires"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp" />
+
+        <RadioGroup
+            android:id="@+id/health_info_expires_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/health_info_expires_1year"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/health_info_consent_expires_1year"
+                android:textSize="14sp" />
+
+            <RadioButton
+                android:id="@+id/health_info_expires_on"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/health_info_consent_expires_on"
+                android:textSize="14sp"
+                android:layout_marginTop="4dp" />
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/health_info_expires_date"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="24dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp"
+                android:hint="MM / DD / YYYY"
+                android:inputType="none"
+                android:focusable="false"
+                android:clickable="true" />
+
+            <RadioButton
+                android:id="@+id/health_info_expires_until"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/health_info_consent_expires_until"
+                android:textSize="14sp"
+                android:layout_marginTop="4dp" />
+        </RadioGroup>
+
+        <TextView
+            android:id="@+id/health_info_confirm_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/health_info_consent_confirm"
+            android:textSize="12sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp" />
 
         <TextView
             android:id="@+id/hipaa_date_label"
@@ -86,7 +188,7 @@
             android:id="@+id/hipaa_submit"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/hipaa_submit"
+            android:text="@string/health_info_consent_agree_sign"
             android:visibility="visible"
             app:cornerRadius="8dp" />
 

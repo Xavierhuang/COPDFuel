@@ -70,8 +70,41 @@ For each route that requires login (everything except `GET /`):
 3. **Authorization**: select the **JWT authorizer** you created.
 4. **Save**.
 
-Do this for: **GET /me**, **PUT /me**, **POST /register**, **POST /sync**, **POST /consent**, **POST /link-doctor**, **GET /patients**, **GET /patients/{patientId}/overview**.  
+Do this for: **GET /me**, **PUT /me**, **DELETE /me**, **POST /register**, **POST /sync**, **POST /consent**, **POST /link-doctor**, **GET /patients**, **GET /patients/{patientId}/overview**.  
 Leave **GET /** without authorization so the health check works without a token.
+
+---
+
+### Step-by-step: Add DELETE /me and attach Lambda + authorizer
+
+**A. Create the route**
+
+1. In **API Gateway** → your API (e.g. **copd-health-api**) → **Develop** → **Routes**.
+2. Click **Create**.
+3. **Method**: choose **DELETE**. **Path**: enter **/me**.
+4. If the form has **Integration** or **Attach integration**: choose the existing integration that points to **copd-api-handler** (your Lambda). If there is no integration step, go to **Integrations** after creating the route (see B).
+5. Click **Create**.
+
+**B. Attach the Lambda integration (if the route has no integration yet)**
+
+1. **Develop** → **Integrations**.
+2. Find the row for **DELETE /me** (or **DELETE** + **/me**). If it says "No integration" or is empty:
+   - Click **Manage integrations** (or **Create and attach integration**).
+   - **Integration type**: Lambda.
+   - **Lambda function**: **copd-api-handler** (same as your other routes).
+   - **Create** / **Save**.
+3. If **DELETE /me** already shows **copd-api-handler**, the integration is set.
+
+**C. Attach the JWT authorizer**
+
+1. **Develop** → **Routes**.
+2. Click the **DELETE /me** route (the route name in the list).
+3. In the route details, find **Authorization**.
+4. Click **Edit** (or the authorization dropdown).
+5. Set **Authorization** to your **JWT authorizer** (the one you use for GET /me, PUT /me, etc.).
+6. **Save**.
+
+After this, **DELETE /me** will be protected by the same JWT and handled by **copd-api-handler** like your other /me routes.
 
 ---
 
@@ -97,7 +130,7 @@ The Lambda already implements **PUT /me** and **POST /register**: they upsert `c
 ## Quick checklist
 
 - [ ] Tables `copd-practices`, `copd-patient-doctor-links`, `copd-consents`, `copd-health-data` created.
-- [ ] Routes **GET /me**, **POST /sync**, **POST /consent**, **POST /link-doctor**, **GET /patients**, **GET /patients/{patientId}/overview** added and linked to **copd-api-handler**.
+- [ ] Routes **GET /me**, **PUT /me**, **DELETE /me**, **POST /sync**, **POST /consent**, **POST /link-doctor**, **GET /patients**, **GET /patients/{patientId}/overview** added and linked to **copd-api-handler**.
 - [ ] JWT authorizer created with Cognito issuer (and optional audience).
 - [ ] Authorizer attached to all routes except **GET /**.
 - [ ] Lambda has API Gateway invoke permission.

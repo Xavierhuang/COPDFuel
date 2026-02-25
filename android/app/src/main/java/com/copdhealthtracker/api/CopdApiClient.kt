@@ -65,6 +65,10 @@ class CopdApiClient {
         request("POST", "/link-doctor", token, body) { callback(it.map { }) }
     }
 
+    fun deleteMe(token: String, callback: (Result<Unit>) -> Unit) {
+        request("DELETE", "/me", token, null) { callback(it.map { }) }
+    }
+
     private fun request(method: String, path: String, token: String, body: JSONObject?, onResult: (Result<String>) -> Unit) {
         executor.execute {
             try {
@@ -74,6 +78,7 @@ class CopdApiClient {
                 conn.setRequestProperty("Authorization", "Bearer $token")
                 conn.setRequestProperty("Content-Type", "application/json")
                 conn.doOutput = body != null
+                if (method == "DELETE" && body == null) conn.doOutput = false
                 conn.doInput = true
                 if (body != null) {
                     conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
