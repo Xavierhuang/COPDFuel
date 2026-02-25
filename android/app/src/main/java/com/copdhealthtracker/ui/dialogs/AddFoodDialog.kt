@@ -41,8 +41,8 @@ class AddFoodDialog(
     private lateinit var searchAdapter: FoodSearchAdapter
     private lateinit var foodDatabaseHelper: FoodDatabaseHelper
     
-    // USDA FoodData Central API key (same as web app)
-    private val apiKey = "[REDACTED_USDA_API_KEY]"
+    private val usdaApiKey: String
+        get() = com.copdhealthtracker.BuildConfig.USDA_FDC_API_KEY
     
     private var useLocalDatabase = true
     private var selectedCategory = "All Categories"
@@ -258,8 +258,9 @@ class AddFoodDialog(
     }
     
     private suspend fun searchUSDADatabase(query: String): List<FoodSearchResult> = withContext(Dispatchers.IO) {
-        val url = "https://api.nal.usda.gov/fdc/v1/foods/search?query=${java.net.URLEncoder.encode(query, "UTF-8")}&pageSize=15&dataType=Foundation,SR%20Legacy,Branded&api_key=$apiKey"
-        
+        if (usdaApiKey.isBlank()) return@withContext emptyList()
+        val url = "https://api.nal.usda.gov/fdc/v1/foods/search?query=${java.net.URLEncoder.encode(query, "UTF-8")}&pageSize=15&dataType=Foundation,SR%20Legacy,Branded&api_key=$usdaApiKey"
+
         val response = URL(url).readText()
         val json = JSONObject(response)
         val foods = json.optJSONArray("foods") ?: return@withContext emptyList()

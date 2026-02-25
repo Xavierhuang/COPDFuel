@@ -48,8 +48,8 @@ class ProgramsNearMeFragment : Fragment() {
     private var filteredPrograms: List<Program> = emptyList()
     private var allPrograms: List<Program> = emptyList()
 
-    // Google Places API Key - In production, this should be stored securely
-    private val GOOGLE_PLACES_API_KEY = "[REDACTED_GOOGLE_PLACES_KEY]"
+    private val googlePlacesApiKey: String
+        get() = com.copdhealthtracker.BuildConfig.GOOGLE_PLACES_API_KEY
 
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -272,6 +272,10 @@ class ProgramsNearMeFragment : Fragment() {
             showSampleData()
             return
         }
+        if (googlePlacesApiKey.isBlank()) {
+            showSampleData()
+            return
+        }
 
         showLoading(true)
         binding.locationStatusText.text = "Getting your location..."
@@ -305,6 +309,10 @@ class ProgramsNearMeFragment : Fragment() {
     }
 
     private fun searchByAddress(address: String) {
+        if (googlePlacesApiKey.isBlank()) {
+            showSampleData()
+            return
+        }
         showLoading(true)
         binding.addressStatusText.text = "Searching..."
         binding.locationCheck.visibility = View.GONE
@@ -313,7 +321,7 @@ class ProgramsNearMeFragment : Fragment() {
             try {
                 val geocodeUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=${
                     java.net.URLEncoder.encode(address, "UTF-8")
-                }&key=$GOOGLE_PLACES_API_KEY"
+                }&key=$googlePlacesApiKey"
 
                 val response = withContext(Dispatchers.IO) {
                     URL(geocodeUrl).readText()
@@ -391,7 +399,7 @@ class ProgramsNearMeFragment : Fragment() {
                         }
                     }
                 """.trimIndent()
-                    val connection = URL("$url?key=$GOOGLE_PLACES_API_KEY").openConnection() as java.net.HttpURLConnection
+                    val connection = URL("$url?key=$googlePlacesApiKey").openConnection() as java.net.HttpURLConnection
                     connection.requestMethod = "POST"
                     connection.setRequestProperty("Content-Type", "application/json")
                     connection.setRequestProperty("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.nationalPhoneNumber,places.regularOpeningHours")

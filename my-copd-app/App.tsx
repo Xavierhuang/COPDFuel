@@ -166,9 +166,10 @@ export default function App() {
       // - Branded Foods (8,000+ like NCCDB)
       // - Survey Foods (FNDDS - what people actually eat)
       
-      // Using your personal USDA API key for higher rate limits
+      const usdaApiKey = process.env.EXPO_PUBLIC_USDA_API_KEY ?? '';
+      if (!usdaApiKey) throw new Error('USDA API key not configured');
       const response = await fetch(
-        `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&pageSize=15&dataType=Foundation,SR%20Legacy,Branded&api_key=[REDACTED_USDA_API_KEY]`
+        `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&pageSize=15&dataType=Foundation,SR%20Legacy,Branded&api_key=${usdaApiKey}`
       );
       
       if (!response.ok) {

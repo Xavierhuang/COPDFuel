@@ -4,6 +4,12 @@ plugins {
     id 'kotlin-kapt'
 }
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader("UTF-8") { reader -> localProperties.load(reader) }
+}
+
 android {
     namespace 'com.copdhealthtracker'
     compileSdk 34
@@ -19,6 +25,8 @@ android {
         buildConfigField "String", "API_BASE_URL", "\"https://d2gfwfsr2a.execute-api.us-east-2.amazonaws.com\""
         // Set to your published privacy policy URL (e.g. "https://your-domain.com/privacy"). See docs/PRIVACY_POLICY_DRAFT.md.
         buildConfigField "String", "PRIVACY_POLICY_URL", "\"\""
+        buildConfigField "String", "GOOGLE_PLACES_API_KEY", "\"${localProperties.getProperty("GOOGLE_PLACES_API_KEY", "")}\""
+        buildConfigField "String", "USDA_FDC_API_KEY", "\"${localProperties.getProperty("USDA_FDC_API_KEY", "")}\""
         
         kapt {
             arguments {

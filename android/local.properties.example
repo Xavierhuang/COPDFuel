@@ -1,0 +1,5 @@
+# Copy to local.properties and fill in. Do not commit local.properties.
+# sdk.dir is set by Android Studio; add the keys below for optional features.
+
+GOOGLE_PLACES_API_KEY=
+USDA_FDC_API_KEY=

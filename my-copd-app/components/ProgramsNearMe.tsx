@@ -114,8 +114,7 @@ export function ProgramsNearMe() {
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [manualLocation, setManualLocation] = useState('');
 
-  // Google Places API Key - In production, this should be stored securely
-  const GOOGLE_PLACES_API_KEY = '[REDACTED_GOOGLE_PLACES_KEY]';
+  const googlePlacesApiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY ?? '';
 
   useEffect(() => {
     requestLocationPermission();
@@ -204,9 +203,10 @@ export function ProgramsNearMe() {
   };
 
   const searchGooglePlaces = async (query: string, lat: number, lng: number): Promise<Program[]> => {
+    if (!googlePlacesApiKey) return [];
     try {
       const radius = 50000; // 50km radius
-      const url = `https://places.googleapis.com/v1/places:searchNearby?key=${GOOGLE_PLACES_API_KEY}`;
+      const url = `https://places.googleapis.com/v1/places:searchNearby?key=${googlePlacesApiKey}`;
       
       console.log(`Searching for: ${query} at ${lat}, ${lng}`);
       
@@ -356,11 +356,14 @@ export function ProgramsNearMe() {
       Alert.alert('Error', 'Please enter a location to search');
       return;
     }
+    if (!googlePlacesApiKey) {
+      setFilteredPrograms(samplePrograms);
+      return;
+    }
 
     try {
       setIsLoading(true);
-      // Use Google Geocoding API to get coordinates from address
-      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(manualLocation)}&key=${GOOGLE_PLACES_API_KEY}`;
+      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(manualLocation)}&key=${googlePlacesApiKey}`;
       const response = await fetch(geocodeUrl);
       const data = await response.json();
 
