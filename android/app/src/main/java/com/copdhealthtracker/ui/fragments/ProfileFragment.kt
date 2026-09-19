@@ -17,12 +17,19 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
 import com.copdhealthtracker.HipaaAuthorizationActivity
+import com.copdhealthtracker.PaywallActivity
 import com.copdhealthtracker.R
+import com.copdhealthtracker.data.model.WeightEntry
 import com.copdhealthtracker.databinding.FragmentProfileBinding
 import com.copdhealthtracker.utils.AppApplication
 import com.copdhealthtracker.utils.HipaaConsentStorage
+import com.copdhealthtracker.utils.HipaaGate
+import com.copdhealthtracker.utils.ProfileWeightSync
 import com.copdhealthtracker.utils.ReportGenerator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -54,7 +61,7 @@ class ProfileFragment : Fragment() {
         val repository = (requireActivity().application as AppApplication).repository
         reportGenerator = ReportGenerator(requireContext(), repository)
         setupViews()
-        loadProfileData()
+        setupPremiumRow()
         setupShareButton()
         setupHipaaAuthorization()
         setupLinkDoctor()
@@ -67,6 +74,7 @@ class ProfileFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         if (::hipaaStorage.isInitialized) updateHipaaStatus()
+        loadProfileData()
     }
 
     private fun setupHipaaAuthorization() {
@@ -187,9 +195,28 @@ class ProfileFragment : Fragment() {
         }
     }
     
+    private fun setupPremiumRow() {
+        binding.profilePremiumItem.setOnClickListener {
+            startActivity(Intent(requireContext(), PaywallActivity::class.java))
+        }
+        lifecycleScope.launch {
+            (requireActivity().application as AppApplication).billingManager.isPremium.collect { isPremium ->
+                binding.profilePremiumLabel.text = if (isPremium) getString(R.string.profile_premium_active) else getString(R.string.profile_premium_subscribe)
+            }
+        }
+    }
+
     private fun setupShareButton() {
         binding.btnShareReport.setOnClickListener {
-            showShareOptions()
+            lifecycleScope.launch {
+                val isPremium = (requireActivity().application as AppApplication).billingManager.isPremium.first()
+                if (isPremium) {
+                    showShareOptions()
+                } else {
+                    Toast.makeText(requireContext(), R.string.profile_share_report_premium_required, Toast.LENGTH_SHORT).show()
+                    startActivity(Intent(requireContext(), PaywallActivity::class.java))
+                }
+            }
         }
     }
     
@@ -210,6 +237,7 @@ class ProfileFragment : Fragment() {
     }
     
     private fun shareViaEmail() {
+        if (!HipaaGate.requireConsent(requireContext(), "share your report")) return
         lifecycleScope.launch {
             try {
                 val report = reportGenerator.generateFullReport()
@@ -228,8 +256,9 @@ class ProfileFragment : Fragment() {
             }
         }
     }
-    
+
     private fun shareViaText() {
+        if (!HipaaGate.requireConsent(requireContext(), "share your report")) return
         lifecycleScope.launch {
             try {
                 val report = reportGenerator.generateFullReport()
@@ -248,8 +277,9 @@ class ProfileFragment : Fragment() {
             }
         }
     }
-    
+
     private fun shareViaOther() {
+        if (!HipaaGate.requireConsent(requireContext(), "share your report")) return
         lifecycleScope.launch {
             try {
                 val report = reportGenerator.generateFullReport()
@@ -597,8 +627,19 @@ class ProfileFragment : Fragment() {
                         .putString(key, value)
                         .putString("last_updated", SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date()))
                         .apply()
-                    loadProfileData()
-                    Toast.makeText(requireContext(), "$title updated successfully!", Toast.LENGTH_SHORT).show()
+                    lifecycleScope.launch {
+                        if (key == "weight") {
+                            value.toDoubleOrNull()?.takeIf { it > 0 }?.let { lbs ->
+                                withContext(Dispatchers.IO) {
+                                    (requireActivity().application as AppApplication).repository.insertWeight(
+                                        WeightEntry(weight = lbs, isGoal = false)
+                                    )
+                                }
+                            }
+                        }
+                        loadProfileDataInternal()
+                        Toast.makeText(requireContext(), "$title updated successfully!", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -606,6 +647,20 @@ class ProfileFragment : Fragment() {
     }
     
     private fun loadProfileData() {
+        lifecycleScope.launch { loadProfileDataInternal() }
+    }
+
+    private suspend fun loadProfileDataInternal() {
+        withContext(Dispatchers.IO) {
+            ProfileWeightSync.syncProfileAndDbWeight(
+                requireContext(),
+                (requireActivity().application as AppApplication).repository
+            )
+        }
+        applyProfileUiFromPrefs()
+    }
+
+    private fun applyProfileUiFromPrefs() {
         val age = prefs.getString("age", null)
         binding.profileAgeValue.text = if (age.isNullOrEmpty() || age == "Not set") "N/A" else age
         

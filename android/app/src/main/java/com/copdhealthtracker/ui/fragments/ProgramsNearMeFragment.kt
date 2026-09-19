@@ -452,6 +452,7 @@ class ProgramsNearMeFragment : Fragment() {
     }
 
     private fun showSampleData() {
+        if (_binding == null) return
         allPrograms = samplePrograms
         filteredPrograms = samplePrograms
         displayPrograms(samplePrograms)
@@ -472,24 +473,25 @@ class ProgramsNearMeFragment : Fragment() {
     }
 
     private fun displayPrograms(programs: List<Program>) {
-        binding.programsListContainer.removeAllViews()
-        binding.resultsCount.text = "${programs.size} program${if (programs.size != 1) "s" else ""} found"
+        val b = _binding ?: return
+        b.programsListContainer.removeAllViews()
+        b.resultsCount.text = "${programs.size} program${if (programs.size != 1) "s" else ""} found"
 
         if (programs.isEmpty()) {
-            binding.noResultsContainer.visibility = View.VISIBLE
-            binding.resultsContainer.visibility = View.GONE
+            b.noResultsContainer.visibility = View.VISIBLE
+            b.resultsContainer.visibility = View.GONE
         } else {
-            binding.noResultsContainer.visibility = View.GONE
-            binding.resultsContainer.visibility = View.VISIBLE
+            b.noResultsContainer.visibility = View.GONE
+            b.resultsContainer.visibility = View.VISIBLE
 
             programs.forEach { program ->
                 val cardView = layoutInflater.inflate(
                     R.layout.item_program_card,
-                    binding.programsListContainer,
+                    b.programsListContainer,
                     false
                 )
                 bindProgramCard(cardView, program)
-                binding.programsListContainer.addView(cardView)
+                b.programsListContainer.addView(cardView)
             }
         }
     }
@@ -588,9 +590,10 @@ class ProgramsNearMeFragment : Fragment() {
     }
 
     private fun showLoading(show: Boolean) {
-        binding.loadingContainer.visibility = if (show) View.VISIBLE else View.GONE
+        val b = _binding ?: return
+        b.loadingContainer.visibility = if (show) View.VISIBLE else View.GONE
         if (show) {
-            binding.programsListContainer.removeAllViews()
+            b.programsListContainer.removeAllViews()
         }
     }
 

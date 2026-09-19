@@ -32,7 +32,7 @@
             android:orientation="vertical"
             android:gravity="center"
             android:paddingVertical="8dp"
-            android:paddingHorizontal="2dp"
+            android:paddingHorizontal="0dp"
             android:clickable="true"
             android:focusable="true"
             android:background="?attr/selectableItemBackground">
@@ -45,11 +45,14 @@
 
             <TextView
                 android:id="@+id/nav_home_label"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:gravity="center"
                 android:text="Home"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:textColor="#6b7280"
+                android:maxLines="1"
+                android:includeFontPadding="false"
                 android:layout_marginTop="2dp" />
 
         </LinearLayout>
@@ -62,7 +65,7 @@
             android:orientation="vertical"
             android:gravity="center"
             android:paddingVertical="8dp"
-            android:paddingHorizontal="2dp"
+            android:paddingHorizontal="0dp"
             android:clickable="true"
             android:focusable="true"
             android:background="?attr/selectableItemBackground">
@@ -75,11 +78,14 @@
 
             <TextView
                 android:id="@+id/nav_guidelines_label"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:gravity="center"
                 android:text="Guidelines"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:textColor="#6b7280"
+                android:maxLines="1"
+                android:includeFontPadding="false"
                 android:layout_marginTop="2dp" />
 
         </LinearLayout>
@@ -92,7 +98,7 @@
             android:orientation="vertical"
             android:gravity="center"
             android:paddingVertical="8dp"
-            android:paddingHorizontal="2dp"
+            android:paddingHorizontal="0dp"
             android:clickable="true"
             android:focusable="true"
             android:background="?attr/selectableItemBackground">
@@ -105,11 +111,14 @@
 
             <TextView
                 android:id="@+id/nav_tracking_label"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:gravity="center"
                 android:text="Tracking"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:textColor="#6b7280"
+                android:maxLines="1"
+                android:includeFontPadding="false"
                 android:layout_marginTop="2dp" />
 
         </LinearLayout>
@@ -122,7 +131,7 @@
             android:orientation="vertical"
             android:gravity="center"
             android:paddingVertical="8dp"
-            android:paddingHorizontal="2dp"
+            android:paddingHorizontal="0dp"
             android:clickable="true"
             android:focusable="true"
             android:background="?attr/selectableItemBackground">
@@ -135,11 +144,14 @@
 
             <TextView
                 android:id="@+id/nav_recipes_label"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:gravity="center"
                 android:text="Recipes"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:textColor="#6b7280"
+                android:maxLines="1"
+                android:includeFontPadding="false"
                 android:layout_marginTop="2dp" />
 
         </LinearLayout>
@@ -152,7 +164,7 @@
             android:orientation="vertical"
             android:gravity="center"
             android:paddingVertical="8dp"
-            android:paddingHorizontal="2dp"
+            android:paddingHorizontal="0dp"
             android:clickable="true"
             android:focusable="true"
             android:background="?attr/selectableItemBackground">
@@ -165,11 +177,14 @@
 
             <TextView
                 android:id="@+id/nav_resources_label"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:gravity="center"
                 android:text="Resources"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:textColor="#6b7280"
+                android:maxLines="1"
+                android:includeFontPadding="false"
                 android:layout_marginTop="2dp" />
 
         </LinearLayout>
@@ -182,7 +197,7 @@
             android:orientation="vertical"
             android:gravity="center"
             android:paddingVertical="8dp"
-            android:paddingHorizontal="2dp"
+            android:paddingHorizontal="0dp"
             android:clickable="true"
             android:focusable="true"
             android:background="?attr/selectableItemBackground">
@@ -195,11 +210,14 @@
 
             <TextView
                 android:id="@+id/nav_profile_label"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:gravity="center"
                 android:text="Profile"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:textColor="#6b7280"
+                android:maxLines="1"
+                android:includeFontPadding="false"
                 android:layout_marginTop="2dp" />
 
         </LinearLayout>

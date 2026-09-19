@@ -25,7 +25,28 @@
   <string name="health_info_consent_confirm">By tapping \"Agree &amp; Sign\", I confirm I am the patient and that the date below is correct.</string>
   <string name="health_info_consent_agree_sign">Agree &amp; Sign</string>
   <string name="health_info_consent_dob_required">Date of birth is required.</string>
+  <string name="health_info_consent_signature_label">Sign with your finger or stylus</string>
+  <string name="health_info_consent_signature_clear">Clear</string>
+  <string name="health_info_consent_signature_required">Please draw your signature above.</string>
+  <string name="dob_dialog_year">Year</string>
+  <string name="dob_dialog_month">Month</string>
+  <string name="dob_dialog_day">Day</string>
+  <string name="dob_dialog_invalid">Please enter a valid date (year 1900–%1$d).</string>
   <string name="health_info_consent_expiry_date_required">Please enter an expiry date.</string>
+  <string name="tracking_import_from_device">Import All from Device</string>
+  <string name="tracking_import_from_device_rationale_title">Why COPD Fuel needs Health Connect access</string>
+  <string name="tracking_import_from_device_rationale_message">COPD Fuel is a health tracking app for people with COPD. To import your data from your watch or phone (e.g. Samsung Health, Wear OS), we need read access to:\n\n• Oxygen saturation (SpO2) – to show your oxygen readings in the app\n• Weight – to show your weight history\n• Exercise – to show your workout sessions\n• Steps – to show your daily steps\n• Heart rate – to show your heart rate history\n\nWe use this data only to display and track it in the app. You can optionally share it with your doctor. We do not use it for advertising or sell it. You can revoke access anytime in Health Connect settings.</string>
+  <string name="tracking_import_from_device_unavailable">Health Connect is not available. Install it from the Play Store to import data from your watch or phone.</string>
+  <string name="tracking_import_from_device_grant">Grant access in Health Connect settings to import data from your device.</string>
+  <string name="tracking_import_from_device_success">Imported %d oxygen reading(s) from your device.</string>
+  <string name="tracking_import_from_device_success_full">Imported: %1$d oxygen, %2$d weight, %3$d exercise, %4$d steps, %5$d heart rate from your device.</string>
+  <string name="tracking_import_from_device_none">No health data found in the last 30 days. If you use Samsung Health or a watch, connect it to Health Connect in Settings so data can sync, then try again.</string>
+  <string name="tracking_import_from_device_exercise_hint">Exercise in Health Connect comes from logged workouts (start/stop on watch or Samsung Health), not steps. Log workouts to see them here.</string>
+  <string name="remove_medication">Remove medication</string>
+  <string name="profile_premium">Premium</string>
+  <string name="profile_premium_subscribe">Subscribe to Premium</string>
+  <string name="profile_premium_active">Premium active</string>
+  <string name="profile_share_report_premium_required">Subscribe to Premium to share your health report.</string>
   <string name="expo_system_ui_user_interface_style" translatable="false">automatic</string>
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>

@@ -11,5 +11,7 @@ data class Medication(
     val dosage: String,
     val frequency: String,
     val type: String, // "daily" or "exacerbation"
-    val date: Long = System.currentTimeMillis()
+    val date: Long = System.currentTimeMillis(),
+    val isDiscontinued: Int = 0, // 0 = active, 1 = discontinued
+    val discontinuedDate: Long? = null
 )

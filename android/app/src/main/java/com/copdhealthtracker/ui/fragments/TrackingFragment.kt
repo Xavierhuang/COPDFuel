@@ -1,6 +1,9 @@
 package com.copdhealthtracker.ui.fragments
 
 import android.app.DatePickerDialog
+import android.content.Intent
+import android.os.Build
+import android.util.Log
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -12,6 +15,8 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.health.connect.client.PermissionController
+import com.copdhealthtracker.BuildConfig
 import com.copdhealthtracker.R
 import com.copdhealthtracker.data.model.FavoriteFood
 import com.copdhealthtracker.data.model.FavoriteMeal
@@ -21,16 +26,27 @@ import com.copdhealthtracker.databinding.FragmentTrackingBinding
 import com.copdhealthtracker.ui.dialogs.*
 import com.copdhealthtracker.ui.viewmodel.TrackingViewModel
 import com.copdhealthtracker.ui.viewmodel.TrackingViewModelFactory
+import com.copdhealthtracker.health.HealthConnectImportResult
+import com.copdhealthtracker.health.HealthConnectSync
+import com.copdhealthtracker.health.HEALTH_CONNECT_IMPORT_PERMISSIONS
 import com.copdhealthtracker.utils.AppApplication
+import com.copdhealthtracker.utils.ProfileWeightSync
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
 class TrackingFragment : Fragment() {
+
+    private companion object {
+        private const val TAG_HC_IMPORT = "HCImport"
+    }
+
     private var _binding: FragmentTrackingBinding? = null
     private val binding get() = _binding!!
     private lateinit var viewModel: TrackingViewModel
@@ -42,7 +58,17 @@ class TrackingFragment : Fragment() {
     private var weekDependentJob: Job? = null
     private var monthDependentJob: Job? = null
     private var currentView: ViewType = ViewType.DAY
-    
+
+    private val healthConnectPermissionLauncher = registerForActivityResult(
+        PermissionController.createRequestPermissionResultContract()
+    ) { granted ->
+        if (granted.containsAll(HEALTH_CONNECT_IMPORT_PERMISSIONS)) {
+            runHealthImportAfterPermissionGranted()
+        } else {
+            showGrantHealthConnectToastAndOpenSettings()
+        }
+    }
+
     private enum class ViewType { DAY, WEEK, MONTH }
     
     override fun onCreateView(
@@ -96,6 +122,7 @@ class TrackingFragment : Fragment() {
         
         // COPD Health Tracking buttons
         binding.logOxygenButton.setOnClickListener { showOxygenDialog() }
+        binding.importOxygenFromDeviceButton.setOnClickListener { importOxygenFromDevice() }
         binding.logExerciseButton.setOnClickListener { showExerciseDialog() }
         
         // Quick Add Food and Add from favorites
@@ -622,15 +649,21 @@ class TrackingFragment : Fragment() {
     }
     
     private fun updateMonthLabel() {
-        val cal = Calendar.getInstance().apply {
+        val startCal = Calendar.getInstance().apply {
             set(Calendar.YEAR, selectedYear)
             set(Calendar.MONTH, selectedMonth)
+            set(Calendar.DAY_OF_MONTH, 1)
         }
-        val monthFormat = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
-        binding.monthLabel.text = monthFormat.format(cal.time)
+        val endCal = (startCal.clone() as Calendar).apply {
+            set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))
+        }
+        val fmt = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+        binding.monthLabel.text = "${fmt.format(startCal.time)} – ${fmt.format(endCal.time)}"
     }
     
     private fun startMonthlyObservers() {
+        // Exercise journal lives in SharedPreferences (no Flow), so update once per month change.
+        updateMonthlyExerciseJournal()
         monthDependentJob = lifecycleScope.launch {
             // Observe both foods and weights for the month
             launch {
@@ -724,73 +757,29 @@ class TrackingFragment : Fragment() {
         var totalFat = 0.0
         var daysLogged = 0
         var daysMetProteinGoal = 0
-        
-        // Track weekly data for breakdown
-        val weeklyData = mutableListOf<WeekData>()
-        var weekStartDay = 1
-        var weekCalories = 0.0
-        var weekProtein = 0.0
-        var weekCarbs = 0.0
-        var weekFat = 0.0
-        var weekDaysLogged = 0
-        
+
         for (day in 1..daysInMonth) {
             val dayFoods = foodsByDay[day] ?: emptyList()
-            val dayCals = dayFoods.sumOf { it.calories }
+            if (dayFoods.isEmpty()) continue
+
+            daysLogged++
             val dayProt = dayFoods.sumOf { it.protein }
-            val dayCarb = dayFoods.sumOf { it.carbs }
-            val dayFt = dayFoods.sumOf { it.fat }
-            
-            if (dayFoods.isNotEmpty()) {
-                daysLogged++
-                totalCalories += dayCals
-                totalProtein += dayProt
-                totalCarbs += dayCarb
-                totalFat += dayFt
-                weekDaysLogged++
-                weekCalories += dayCals
-                weekProtein += dayProt
-                weekCarbs += dayCarb
-                weekFat += dayFt
-                
-                if (proteinTarget > 0 && dayProt >= proteinTarget) {
-                    daysMetProteinGoal++
-                }
-            }
-            
-            // Check if week is complete (every 7 days or end of month)
-            val dayCal = Calendar.getInstance().apply {
-                set(Calendar.YEAR, selectedYear)
-                set(Calendar.MONTH, selectedMonth)
-                set(Calendar.DAY_OF_MONTH, day)
-            }
-            val dayOfWeek = dayCal.get(Calendar.DAY_OF_WEEK)
-            
-            if (dayOfWeek == Calendar.SATURDAY || day == daysInMonth) {
-                weeklyData.add(WeekData(
-                    startDay = weekStartDay,
-                    endDay = day,
-                    calories = weekCalories.toInt(),
-                    protein = weekProtein.toInt(),
-                    carbs = weekCarbs.toInt(),
-                    fat = weekFat.toInt(),
-                    daysLogged = weekDaysLogged
-                ))
-                weekStartDay = day + 1
-                weekCalories = 0.0
-                weekProtein = 0.0
-                weekCarbs = 0.0
-                weekFat = 0.0
-                weekDaysLogged = 0
+            totalCalories += dayFoods.sumOf { it.calories }
+            totalProtein += dayProt
+            totalCarbs += dayFoods.sumOf { it.carbs }
+            totalFat += dayFoods.sumOf { it.fat }
+
+            if (proteinTarget > 0 && dayProt >= proteinTarget) {
+                daysMetProteinGoal++
             }
         }
-        
+
         // Calculate averages (only for days with data)
         val avgCalories = if (daysLogged > 0) (totalCalories / daysLogged).toInt() else 0
         val avgProtein = if (daysLogged > 0) (totalProtein / daysLogged).toInt() else 0
         val avgCarbs = if (daysLogged > 0) (totalCarbs / daysLogged).toInt() else 0
         val avgFat = if (daysLogged > 0) (totalFat / daysLogged).toInt() else 0
-        
+
         // Update monthly trend report UI
         binding.monthlyAvgCalories.text = avgCalories.toString()
         binding.monthlyAvgProtein.text = "${avgProtein}g"
@@ -799,182 +788,238 @@ class TrackingFragment : Fragment() {
         binding.monthlyTotalCalories.text = "${totalCalories.toInt()} kcal"
         binding.monthlyDaysLogged.text = "$daysLogged / $daysInMonth"
         binding.monthlyProteinGoalDays.text = if (proteinTarget > 0) "$daysMetProteinGoal / $daysInMonth" else "Set protein target"
-        
-        // Build weekly breakdown cards
+
+        // Weekly breakdown removed — clear container so the layout view stays but is empty.
         binding.monthlyWeeksContainer.removeAllViews()
-        
-        weeklyData.forEachIndexed { index, week ->
-            val weekCard = createWeekSummaryCard(
-                weekNumber = index + 1,
-                startDay = week.startDay,
-                endDay = week.endDay,
-                calories = week.calories,
-                protein = week.protein,
-                carbs = week.carbs,
-                fat = week.fat,
-                daysLogged = week.daysLogged,
-                proteinTarget = proteinTarget
-            )
-            binding.monthlyWeeksContainer.addView(weekCard)
-        }
     }
-    
-    private data class WeekData(
-        val startDay: Int,
-        val endDay: Int,
-        val calories: Int,
-        val protein: Int,
-        val carbs: Int,
-        val fat: Int,
-        val daysLogged: Int
+
+    private data class JournalEntry(
+        val savedAt: Long,
+        val dayMillis: Long,
+        val timeText: String,
+        val exercise: String,
+        val sets: Int,
+        val reps: Int,
+        val weight: Double,
+        val weightUnit: String,
+        val activity: String,
+        val warmUp: String
     )
-    
-    private fun createWeekSummaryCard(
-        weekNumber: Int,
-        startDay: Int,
-        endDay: Int,
-        calories: Int,
-        protein: Int,
-        carbs: Int,
-        fat: Int,
-        daysLogged: Int,
-        proteinTarget: Int
-    ): View {
-        val density = resources.displayMetrics.density
-        val hasData = daysLogged > 0
-        
-        val card = com.google.android.material.card.MaterialCardView(requireContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                bottomMargin = (8 * density).toInt()
+
+    private fun startOfDay(millis: Long): Long {
+        val c = Calendar.getInstance()
+        c.timeInMillis = millis
+        c.set(Calendar.HOUR_OF_DAY, 0)
+        c.set(Calendar.MINUTE, 0)
+        c.set(Calendar.SECOND, 0)
+        c.set(Calendar.MILLISECOND, 0)
+        return c.timeInMillis
+    }
+
+    private fun loadExerciseJournalEntries(): List<JournalEntry> {
+        val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(requireContext())
+        val raw = prefs.getString("exercise_journal_log", null) ?: return emptyList()
+        val list = mutableListOf<JournalEntry>()
+        try {
+            val arr = org.json.JSONArray(raw)
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                list.add(JournalEntry(
+                    savedAt = o.optLong("savedAt", 0L),
+                    dayMillis = o.optLong("dayMillis", 0L),
+                    timeText = o.optString("timeText", ""),
+                    exercise = o.optString("exercise", ""),
+                    sets = o.optInt("sets", 0),
+                    reps = o.optInt("reps", 0),
+                    weight = o.optDouble("weight", 0.0),
+                    weightUnit = o.optString("weightUnit", "lbs"),
+                    activity = o.optString("activity", ""),
+                    warmUp = o.optString("warmUp", "")
+                ))
             }
-            radius = 8 * density
-            cardElevation = 2 * density
-            setCardBackgroundColor(
-                if (hasData) ContextCompat.getColor(requireContext(), R.color.backgroundWhite)
-                else android.graphics.Color.parseColor("#F9FAFB")
-            )
-        }
-        
-        val content = LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(
-                (16 * density).toInt(),
-                (12 * density).toInt(),
-                (16 * density).toInt(),
-                (12 * density).toInt()
-            )
-        }
-        
-        // Header row with week name
-        val headerRow = LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_VERTICAL
-        }
-        
-        val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
+        } catch (_: Exception) { /* fall through with empty list */ }
+        return list
+    }
+
+    private fun updateMonthlyExerciseJournal() {
+        if (_binding == null) return
+        val ctx = requireContext()
+        val density = resources.displayMetrics.density
+
         val cal = Calendar.getInstance().apply {
             set(Calendar.YEAR, selectedYear)
             set(Calendar.MONTH, selectedMonth)
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
         }
-        val monthName = monthFormat.format(cal.time)
-        
-        val weekText = TextView(requireContext()).apply {
-            text = "Week $weekNumber"
-            textSize = 16f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(ContextCompat.getColor(requireContext(), R.color.textPrimary))
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        
-        val dateText = TextView(requireContext()).apply {
-            text = "$monthName $startDay - $endDay"
-            textSize = 12f
-            setTextColor(ContextCompat.getColor(requireContext(), R.color.textSecondary))
-        }
-        
-        headerRow.addView(weekText)
-        headerRow.addView(dateText)
-        content.addView(headerRow)
-        
-        if (hasData) {
-            // Days logged info
-            val daysText = TextView(requireContext()).apply {
-                text = "$daysLogged days logged"
-                textSize = 12f
-                setTextColor(ContextCompat.getColor(requireContext(), R.color.textSecondary))
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = (4 * density).toInt()
-                }
-            }
-            content.addView(daysText)
-            
-            // Nutrition summary row
-            val nutritionRow = LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = (8 * density).toInt()
-                }
-            }
-            
-            // Avg Calories
-            val avgCal = if (daysLogged > 0) calories / daysLogged else 0
-            val avgProt = if (daysLogged > 0) protein / daysLogged else 0
-            val avgCarb = if (daysLogged > 0) carbs / daysLogged else 0
-            val avgFt = if (daysLogged > 0) fat / daysLogged else 0
-            
-            val calColumn = createNutrientColumn("$avgCal", "Avg Cal", "#22c55e")
-            val protColumn = createNutrientColumn("${avgProt}g", "Avg Prot", "#3b82f6")
-            val carbColumn = createNutrientColumn("${avgCarb}g", "Avg Carb", "#f59e0b")
-            val fatColumn = createNutrientColumn("${avgFt}g", "Avg Fat", "#ef4444")
-            
-            nutritionRow.addView(calColumn)
-            nutritionRow.addView(protColumn)
-            nutritionRow.addView(carbColumn)
-            nutritionRow.addView(fatColumn)
-            content.addView(nutritionRow)
-            
-            // Total calories for the week
-            val totalText = TextView(requireContext()).apply {
-                text = "Total: $calories kcal"
-                textSize = 11f
-                setTextColor(ContextCompat.getColor(requireContext(), R.color.textSecondary))
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = (6 * density).toInt()
-                }
-            }
-            content.addView(totalText)
+        val monthStart = cal.timeInMillis
+        val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+        cal.add(Calendar.MONTH, 1)
+        val monthEnd = cal.timeInMillis
+
+        val all = loadExerciseJournalEntries()
+        val monthEntries = all.filter { it.dayMillis in monthStart until monthEnd }
+
+        // Monthly summary
+        val summary = binding.monthlyExerciseSummary
+        summary.removeAllViews()
+
+        if (monthEntries.isEmpty()) {
+            summary.addView(TextView(ctx).apply {
+                text = "No exercise journal entries for this month."
+                textSize = 14f
+                setTextColor(ContextCompat.getColor(ctx, R.color.textSecondary))
+            })
         } else {
-            // No data message
-            val noDataText = TextView(requireContext()).apply {
-                text = "No food logged"
-                textSize = 13f
-                setTextColor(ContextCompat.getColor(requireContext(), R.color.textSecondary))
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = (8 * density).toInt()
+            val activeDays = monthEntries.map { startOfDay(it.dayMillis) }.toSet().size
+            val totalSets = monthEntries.sumOf { it.sets }
+            val totalReps = monthEntries.sumOf { it.reps }
+            val uniqueExercises = monthEntries.map { it.exercise.trim() }.filter { it.isNotEmpty() }.distinct()
+
+            fun addStat(label: String, value: String) {
+                val row = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = (4 * density).toInt() }
+                }
+                row.addView(TextView(ctx).apply {
+                    text = label
+                    textSize = 13f
+                    setTextColor(ContextCompat.getColor(ctx, R.color.textSecondary))
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                })
+                row.addView(TextView(ctx).apply {
+                    text = value
+                    textSize = 14f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setTextColor(ContextCompat.getColor(ctx, R.color.textPrimary))
+                })
+                summary.addView(row)
+            }
+
+            addStat("Entries", monthEntries.size.toString())
+            addStat("Active Days", "$activeDays / $daysInMonth")
+            if (totalSets > 0) addStat("Total Sets", totalSets.toString())
+            if (totalReps > 0) addStat("Total Reps", totalReps.toString())
+
+            if (uniqueExercises.isNotEmpty()) {
+                summary.addView(TextView(ctx).apply {
+                    text = "Exercises performed:"
+                    textSize = 13f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setTextColor(ContextCompat.getColor(ctx, R.color.textPrimary))
+                    setPadding(0, (12 * density).toInt(), 0, (4 * density).toInt())
+                })
+                uniqueExercises.forEach { ex ->
+                    summary.addView(TextView(ctx).apply {
+                        text = "• $ex"
+                        textSize = 13f
+                        setTextColor(ContextCompat.getColor(ctx, R.color.textSecondary))
+                        setPadding(0, 0, 0, (2 * density).toInt())
+                    })
                 }
             }
-            content.addView(noDataText)
         }
-        
+
+        // Weekly breakdown removed — show all monthly entries directly below summary.
+        val weeksContainer = binding.monthlyExerciseWeeksContainer
+        weeksContainer.removeAllViews()
+
+        // All individual entries this month (archive view — older than 7 days have left Pulmonary Rehab list)
+        if (monthEntries.isNotEmpty()) {
+            weeksContainer.addView(TextView(ctx).apply {
+                text = "All Entries This Month"
+                textSize = 14f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(ContextCompat.getColor(ctx, R.color.textPrimary))
+                setPadding(0, (16 * density).toInt(), 0, (8 * density).toInt())
+            })
+
+            val entryDateFormat = SimpleDateFormat("MMM d", Locale.getDefault())
+            monthEntries.sortedByDescending { it.savedAt }.forEach { entry ->
+                weeksContainer.addView(buildMonthlyEntryCard(ctx, entry, entryDateFormat, density))
+            }
+        }
+    }
+
+    private fun buildMonthlyEntryCard(
+        ctx: android.content.Context,
+        entry: JournalEntry,
+        dateFormat: SimpleDateFormat,
+        density: Float
+    ): View {
+        val card = com.google.android.material.card.MaterialCardView(ctx).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (8 * density).toInt() }
+            radius = 8 * density
+            cardElevation = 1 * density
+            setCardBackgroundColor(ContextCompat.getColor(ctx, R.color.backgroundWhite))
+        }
+        val content = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(
+                (14 * density).toInt(),
+                (10 * density).toInt(),
+                (14 * density).toInt(),
+                (10 * density).toInt()
+            )
+        }
+        content.addView(TextView(ctx).apply {
+            text = "${dateFormat.format(java.util.Date(entry.dayMillis))}  •  ${entry.timeText.ifBlank { "" }}".trim()
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(ctx, R.color.textSecondary))
+        })
+        if (entry.exercise.isNotBlank()) {
+            content.addView(TextView(ctx).apply {
+                text = entry.exercise
+                textSize = 15f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(ContextCompat.getColor(ctx, R.color.textPrimary))
+                setPadding(0, (4 * density).toInt(), 0, 0)
+            })
+        }
+        val parts = mutableListOf<String>()
+        if (entry.sets > 0) parts.add("${entry.sets} sets")
+        if (entry.reps > 0) parts.add("${entry.reps} reps")
+        if (entry.weight > 0) {
+            val w = if (entry.weight % 1.0 == 0.0) entry.weight.toInt().toString() else entry.weight.toString()
+            parts.add("$w ${entry.weightUnit}")
+        }
+        if (parts.isNotEmpty()) {
+            content.addView(TextView(ctx).apply {
+                text = parts.joinToString(" • ")
+                textSize = 13f
+                setTextColor(ContextCompat.getColor(ctx, R.color.textPrimary))
+                setPadding(0, (2 * density).toInt(), 0, 0)
+            })
+        }
+        if (entry.activity.isNotBlank()) {
+            content.addView(TextView(ctx).apply {
+                text = "Activity: ${entry.activity}"
+                textSize = 12f
+                setTextColor(ContextCompat.getColor(ctx, R.color.textSecondary))
+                setPadding(0, (2 * density).toInt(), 0, 0)
+            })
+        }
+        if (entry.warmUp.isNotBlank()) {
+            content.addView(TextView(ctx).apply {
+                text = "Warm Up: ${entry.warmUp}"
+                textSize = 12f
+                setTextColor(ContextCompat.getColor(ctx, R.color.textSecondary))
+                setPadding(0, (2 * density).toInt(), 0, 0)
+            })
+        }
         card.addView(content)
         return card
     }
-    
+
     private fun checkProfileSetup() {
         val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(requireContext())
         val weight = prefs.getString("weight", null)
@@ -1273,6 +1318,69 @@ class TrackingFragment : Fragment() {
                         binding.goalWeightLabel.text = "Goal: ${latestGoal.weight} lbs"
                     } else {
                         binding.goalWeightLabel.visibility = View.GONE
+                    }
+                }
+            }
+
+            // Steps: show Health Connect (phone/watch health pipeline) when read permission granted; else cached DB from import
+            launch {
+                val ctx = requireContext()
+                val fromHc =
+                    if (Build.VERSION.SDK_INT >= 26 && HealthConnectSync.isAvailable(ctx)) {
+                        withContext(Dispatchers.IO) {
+                            HealthConnectSync.readStepsForCalendarDay(ctx, selectedDateMillis)
+                        }
+                    } else {
+                        null
+                    }
+                if (fromHc != null && fromHc.isSuccess) {
+                    val total = fromHc.getOrNull() ?: 0
+                    binding.stepsValue.text = if (total > 0) total.toString() else "N/A"
+                } else {
+                    viewModel.getStepsForDate(selectedDateMillis).collect { steps ->
+                        val total = steps.sumOf { it.count }
+                        binding.stepsValue.text = if (total > 0) total.toString() else "N/A"
+                    }
+                }
+            }
+
+            // Heart rate for selected day (from device import)
+            launch {
+                viewModel.getHeartRatesForDate(selectedDateMillis).collect { rates ->
+                    if (rates.isNotEmpty()) {
+                        val latest = rates.maxByOrNull { it.date }
+                        binding.heartRateValue.text = "${latest?.bpm ?: "N/A"} bpm"
+
+                        binding.heartRateList.removeAllViews()
+                        val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
+                        rates.sortedByDescending { it.date }.take(10).forEach { entry ->
+                            val row = LinearLayout(requireContext()).apply {
+                                orientation = LinearLayout.HORIZONTAL
+                                layoutParams = LinearLayout.LayoutParams(
+                                    LinearLayout.LayoutParams.MATCH_PARENT,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT
+                                ).apply {
+                                    topMargin = (4 * resources.displayMetrics.density).toInt()
+                                }
+                            }
+                            val bpmText = TextView(requireContext()).apply {
+                                text = "${entry.bpm} bpm"
+                                textSize = 12f
+                                setTextColor(ContextCompat.getColor(requireContext(), R.color.textPrimary))
+                                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                            }
+                            val timeText = TextView(requireContext()).apply {
+                                text = timeFormat.format(entry.date)
+                                textSize = 10f
+                                setTextColor(ContextCompat.getColor(requireContext(), R.color.textSecondary))
+                            }
+                            row.addView(bpmText)
+                            row.addView(timeText)
+                            binding.heartRateList.addView(row)
+                        }
+                    } else {
+                        binding.heartRateValue.text = "N/A"
+                        binding.heartRateList.removeAllViews()
                     }
                 }
             }
@@ -1933,10 +2041,117 @@ class TrackingFragment : Fragment() {
         }
         dialog.show(parentFragmentManager, "AddOxygenDialog")
     }
+
+    private fun importOxygenFromDevice() {
+        if (!HealthConnectSync.isAvailable(requireContext())) {
+            android.widget.Toast.makeText(
+                requireContext(),
+                getString(R.string.tracking_import_from_device_unavailable),
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle(R.string.tracking_import_from_device_rationale_title)
+            .setMessage(R.string.tracking_import_from_device_rationale_message)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                healthConnectPermissionLauncher.launch(HEALTH_CONNECT_IMPORT_PERMISSIONS)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showGrantHealthConnectToastAndOpenSettings() {
+        android.widget.Toast.makeText(
+            requireContext(),
+            getString(R.string.tracking_import_from_device_grant),
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+        openHealthConnectPermissionSettings()
+    }
+
+    private fun openHealthConnectPermissionSettings() {
+        if (Build.VERSION.SDK_INT < 34) {
+            return
+        }
+        try {
+            val intent = Intent("android.health.connect.action.MANAGE_HEALTH_PERMISSIONS").apply {
+                putExtra(Intent.EXTRA_PACKAGE_NAME, requireContext().packageName)
+            }
+            if (intent.resolveActivity(requireContext().packageManager) != null) {
+                startActivity(intent)
+            }
+        } catch (_: Exception) { }
+    }
+
+    private fun runHealthImportAfterPermissionGranted() {
+        val end = System.currentTimeMillis()
+        val start = end - 30L * 24 * 60 * 60 * 1000
+        lifecycleScope.launch {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG_HC_IMPORT, "import: reading last 30 days from Health Connect")
+            }
+            val result = HealthConnectSync.readAllFromDevice(requireContext(), start, end)
+            result.fold(
+                onSuccess = { data ->
+                    if (data.totalCount == 0) {
+                        if (BuildConfig.DEBUG) {
+                            Log.d(
+                                TAG_HC_IMPORT,
+                                "import: HC returned no records (totalCount=0). Emulator often has no HC data; grant permissions and sync Samsung Health / Google Fit into Health Connect."
+                            )
+                        }
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            getString(R.string.tracking_import_from_device_none),
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    } else {
+                        if (BuildConfig.DEBUG) {
+                            Log.d(
+                                TAG_HC_IMPORT,
+                                "import: HC returned data, persisting (O2=${data.oxygen.size} weight=${data.weight.size} exercise=${data.exercise.size} stepsDays=${data.steps.size} HR=${data.heartRate.size})"
+                            )
+                        }
+                        viewModel.insertHealthConnectImport(data)
+                        withContext(Dispatchers.IO) {
+                            ProfileWeightSync.syncPrefsFromRepositoryCurrentWeight(
+                                requireContext(),
+                                (requireActivity().application as AppApplication).repository
+                            )
+                        }
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            getString(R.string.tracking_import_from_device_success_full,
+                                data.oxygen.size, data.weight.size, data.exercise.size, data.steps.size, data.heartRate.size),
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                        if (data.exercise.isEmpty() && data.totalCount > 0) {
+                            android.widget.Toast.makeText(
+                                requireContext(),
+                                getString(R.string.tracking_import_from_device_exercise_hint),
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+                        startDateDependentObservers()
+                    }
+                },
+                onFailure = { e ->
+                    if (BuildConfig.DEBUG) {
+                        Log.e(TAG_HC_IMPORT, "import: read failed (${e.javaClass.simpleName}): ${e.message}", e)
+                    }
+                    showGrantHealthConnectToastAndOpenSettings()
+                }
+            )
+        }
+    }
     
     private fun showWeightDialog() {
         val dialog = AddWeightDialog { weightEntry ->
             viewModel.insertWeight(weightEntry)
+            if (!weightEntry.isGoal) {
+                ProfileWeightSync.writeWeightToPrefs(requireContext(), weightEntry.weight)
+            }
         }
         dialog.show(parentFragmentManager, "AddWeightDialog")
     }

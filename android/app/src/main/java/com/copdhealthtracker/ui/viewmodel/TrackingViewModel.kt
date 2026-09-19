@@ -1,17 +1,26 @@
 package com.copdhealthtracker.ui.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.copdhealthtracker.BuildConfig
 import com.copdhealthtracker.data.model.*
+import com.copdhealthtracker.health.HealthConnectImportResult
 import com.copdhealthtracker.repository.DataRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import com.copdhealthtracker.data.model.Medication
 
 class TrackingViewModel(private val repository: DataRepository) : ViewModel() {
+
+    companion object {
+        private const val TAG_HC_IMPORT = "HCImport"
+    }
     
     fun getAllFoods(): Flow<List<FoodEntry>> = repository.getAllFoods()
     
@@ -138,6 +147,51 @@ class TrackingViewModel(private val repository: DataRepository) : ViewModel() {
         viewModelScope.launch {
             repository.insertWeight(weight)
         }
+    }
+
+    fun insertSteps(entry: StepsEntry) {
+        viewModelScope.launch {
+            repository.insertSteps(entry)
+        }
+    }
+
+    fun insertHeartRate(entry: HeartRateEntry) {
+        viewModelScope.launch {
+            repository.insertHeartRate(entry)
+        }
+    }
+
+    fun getHeartRatesForDate(dateMillis: Long): Flow<List<HeartRateEntry>> {
+        val calendar = Calendar.getInstance().apply { timeInMillis = dateMillis }
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        val startOfDay = calendar.timeInMillis
+        calendar.add(Calendar.DAY_OF_MONTH, 1)
+        val endOfDay = calendar.timeInMillis
+        return repository.getHeartRatesByDateRange(startOfDay, endOfDay)
+    }
+
+    /** Inserts all Health Connect import data and completes when done. Call before refreshing UI. */
+    suspend fun insertHealthConnectImport(data: HealthConnectImportResult) = withContext(Dispatchers.IO) {
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                TAG_HC_IMPORT,
+                "persist: O2=${data.oxygen.size} weight=${data.weight.size} exercise=${data.exercise.size} " +
+                    "stepsDays=${data.steps.size} heartRate=${data.heartRate.size}"
+            )
+            data.steps.sortedBy { it.date }.forEach { e ->
+                Log.d(TAG_HC_IMPORT, "steps dayStartMillis=${e.date} count=${e.count}")
+            }
+        }
+        data.oxygen.forEach { repository.insertReadingFromHealthConnectImport(it) }
+        data.weight.forEach { repository.insertWeight(it) }
+        data.exercise.forEach { repository.insertExercise(it) }
+        data.steps.forEach { entry ->
+            repository.replaceStepsForDayFromImport(entry.date, entry.count)
+        }
+        data.heartRate.forEach { repository.insertHeartRateFromHealthConnectImport(it) }
     }
     
     fun getOxygenReadingsForDate(dateMillis: Long): Flow<List<OxygenReading>> {
@@ -285,6 +339,18 @@ class TrackingViewModel(private val repository: DataRepository) : ViewModel() {
     }
     
     // Water tracking methods
+    fun getStepsForDate(dateMillis: Long): Flow<List<StepsEntry>> {
+        val calendar = Calendar.getInstance().apply { timeInMillis = dateMillis }
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        val startOfDay = calendar.timeInMillis
+        calendar.add(Calendar.DAY_OF_MONTH, 1)
+        val endOfDayExclusive = calendar.timeInMillis
+        return repository.getStepsByDateRange(startOfDay, endOfDayExclusive - 1)
+    }
+
     fun getWaterEntriesForDate(dateMillis: Long): Flow<List<WaterEntry>> {
         val calendar = Calendar.getInstance().apply { timeInMillis = dateMillis }
         calendar.set(Calendar.HOUR_OF_DAY, 0)

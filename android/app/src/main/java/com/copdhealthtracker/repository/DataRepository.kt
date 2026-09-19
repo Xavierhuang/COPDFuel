@@ -77,6 +77,13 @@ class DataRepository(private val database: AppDatabase) {
         database.oxygenDao().getReadingsByDateRange(startDate, endDate)
     
     suspend fun insertReading(reading: OxygenReading): Long = database.oxygenDao().insertReading(reading)
+
+    /** Skips when the same Health Connect sample timestamp is already in the DB (avoids duplicate rows on re-import). */
+    suspend fun insertReadingFromHealthConnectImport(reading: OxygenReading) {
+        if (database.oxygenDao().countAtInstant(reading.date) == 0) {
+            database.oxygenDao().insertReading(reading)
+        }
+    }
     
     suspend fun deleteReading(reading: OxygenReading) = database.oxygenDao().deleteReading(reading)
     
@@ -96,14 +103,19 @@ class DataRepository(private val database: AppDatabase) {
     
     // Medication operations
     fun getAllMedications(): Flow<List<Medication>> = database.medicationDao().getAllMedications()
-    
+
     fun getMedicationsByType(type: String): Flow<List<Medication>> =
         database.medicationDao().getMedicationsByType(type)
-    
+
+    fun getDiscontinuedMedications(): Flow<List<Medication>> =
+        database.medicationDao().getDiscontinuedMedications()
+
     suspend fun insertMedication(medication: Medication): Long = database.medicationDao().insertMedication(medication)
-    
+
+    suspend fun updateMedication(medication: Medication) = database.medicationDao().updateMedication(medication)
+
     suspend fun deleteMedication(medication: Medication) = database.medicationDao().deleteMedication(medication)
-    
+
     suspend fun deleteMedicationById(id: Long) = database.medicationDao().deleteMedicationById(id)
     
     // Water operations
@@ -117,4 +129,31 @@ class DataRepository(private val database: AppDatabase) {
     suspend fun deleteWaterEntry(entry: WaterEntry) = database.waterDao().deleteWaterEntry(entry)
     
     suspend fun deleteWaterEntryById(id: Long) = database.waterDao().deleteWaterEntryById(id)
+
+    fun getStepsByDateRange(startDate: Long, endDate: Long): Flow<List<StepsEntry>> =
+        database.stepsDao().getStepsByDateRange(startDate, endDate)
+
+    suspend fun insertSteps(entry: StepsEntry): Long = database.stepsDao().insertSteps(entry)
+
+    /** Replaces any existing rows for that calendar day so Health Connect re-import does not stack duplicates. */
+    suspend fun replaceStepsForDayFromImport(dayStartMillis: Long, count: Int) {
+        database.stepsDao().deleteStepsForDayStart(dayStartMillis)
+        database.stepsDao().insertSteps(StepsEntry(count = count, date = dayStartMillis))
+    }
+
+    // Heart rate operations
+    fun getAllHeartRates(): Flow<List<HeartRateEntry>> = database.heartRateDao().getAllHeartRates()
+
+    fun getHeartRatesByDateRange(startDate: Long, endDate: Long): Flow<List<HeartRateEntry>> =
+        database.heartRateDao().getHeartRatesByDateRange(startDate, endDate)
+
+    suspend fun insertHeartRate(entry: HeartRateEntry): Long = database.heartRateDao().insertHeartRate(entry)
+
+    suspend fun insertHeartRateFromHealthConnectImport(entry: HeartRateEntry) {
+        if (database.heartRateDao().countAtInstant(entry.date) == 0) {
+            database.heartRateDao().insertHeartRate(entry)
+        }
+    }
+
+    suspend fun deleteHeartRate(entry: HeartRateEntry) = database.heartRateDao().deleteHeartRate(entry)
 }

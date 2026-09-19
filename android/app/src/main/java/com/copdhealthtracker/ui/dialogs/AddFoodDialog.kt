@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URL
+import kotlin.Int.Companion.MAX_VALUE
 
 class AddFoodDialog(
     private val onSave: (FoodEntry) -> Unit,
@@ -35,118 +36,61 @@ class AddFoodDialog(
     private val insertUserAddedFood: (suspend (UserAddedFood) -> Boolean)? = null,
     private val onAddToMeal: ((FoodEntry) -> Unit)? = null
 ) : DialogFragment() {
-    
+
     private var _binding: DialogAddFoodBinding? = null
     private val binding get() = _binding!!
     private lateinit var searchAdapter: FoodSearchAdapter
     private lateinit var foodDatabaseHelper: FoodDatabaseHelper
-    
+
     private val usdaApiKey: String
         get() = com.copdhealthtracker.BuildConfig.USDA_FDC_API_KEY
-    
+
     private var useLocalDatabase = true
     private var selectedCategory = "All Categories"
-    
+
     // Store selected food result with all nutrients (per 100g)
     private var selectedFood: FoodSearchResult? = null
     private var currentServingSize = ""
     private var servingSizes = mutableListOf<ServingOption>()
-    
+    private var selectedFilterType: FilterType = FilterType.CATEGORY
+    private var selectedCategoryFilter = "All Categories"
+    private var selectedFoodGroupFilter = "All Food Groups"
+    private var cachedCategories: List<String> = emptyList()
+    private var cachedFoodGroups: List<String> = emptyList()
+    private var isDatabaseLoaded = false
+
+    enum class FilterType {
+        CATEGORY, FOOD_GROUP
+    }
+
     data class ServingOption(
         val label: String,
         val grams: Double,
         val multiplier: Double = 1.0
     )
-    
+
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         _binding = DialogAddFoodBinding.inflate(layoutInflater)
-        
-        // Initialize food database helper
+
         foodDatabaseHelper = FoodDatabaseHelper(requireContext())
-        
-        // Load local database and user-added foods
+
         lifecycleScope.launch {
             foodDatabaseHelper.loadDatabase()
             getAllUserAddedFoods?.invoke()?.let { foodDatabaseHelper.setUserAddedFoods(it) }
-            setupCategoryFilter()
-        }
-        
-        // Setup meal category spinner
-        val mealCategories = arrayOf("Breakfast", "Lunch", "Dinner", "Snacks")
-        val mealAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, mealCategories)
-        mealAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.mealCategorySpinner.adapter = mealAdapter
-        
-        // Setup search adapter
-        searchAdapter = FoodSearchAdapter { result ->
-            selectFoodResult(result)
-        }
-        binding.searchResultsList.layoutManager = LinearLayoutManager(requireContext())
-        binding.searchResultsList.adapter = searchAdapter
-        
-        // Setup database toggle
-        binding.databaseToggle.setOnCheckedChangeListener { _, checkedId ->
-            useLocalDatabase = checkedId == binding.radioLocal.id
-            binding.categoryFilterContainer.visibility = if (useLocalDatabase) View.VISIBLE else View.GONE
-            binding.searchStatus.text = if (useLocalDatabase) {
-                "Search from local database (${foodDatabaseHelper.getTotalFoodsCount()} foods)"
-            } else {
-                "Search USDA FoodData Central online"
-            }
-            // Clear previous results
-            binding.searchResultsList.visibility = View.GONE
-            searchAdapter.submitList(emptyList())
-        }
-        
-        // Setup search button
-        binding.searchButton.setOnClickListener {
-            performSearch()
-        }
-        
-        // Setup search on enter key
-        binding.foodSearchEdit.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                performSearch()
-                true
-            } else {
-                false
+
+            cachedCategories = foodDatabaseHelper.getCategories()
+            cachedFoodGroups = foodDatabaseHelper.getFoodGroups()
+            isDatabaseLoaded = true
+
+            withContext(Dispatchers.Main) {
+                setupUIAfterDatabaseLoad()
             }
         }
-        
-        // Setup amount field listener to recalculate nutrition
-        binding.amountEdit.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                updateNutritionDisplay()
-            }
-        })
-        
-        // Setup serving size spinner listener
-        binding.servingSizeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                if (servingSizes.isNotEmpty() && position < servingSizes.size) {
-                    currentServingSize = servingSizes[position].label
-                    updateNutritionDisplay()
-                }
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
-        
-        // Setup toggle manual entry button
-        binding.toggleManualButton.setOnClickListener {
-            if (binding.manualEntrySection.visibility == View.GONE) {
-                binding.manualEntrySection.visibility = View.VISIBLE
-                binding.toggleManualButton.text = "Hide Manual Entry"
-            } else {
-                binding.manualEntrySection.visibility = View.GONE
-                binding.toggleManualButton.text = "Edit Nutrition Manually"
-            }
-        }
-        
-        // Initialize with default serving size
-        setupDefaultServingSize()
-        
+
+        setupBasicUI()
+
+        showFilterLoadingState()
+
         val isAddToMealMode = onAddToMeal != null
         val dialog = AlertDialog.Builder(requireContext())
             .setTitle(if (isAddToMealMode) "Add food to meal" else "Add Food")
@@ -156,7 +100,7 @@ class AddFoodDialog(
                 dismiss()
             }
             .create()
-        
+
         dialog.setOnShowListener {
             val positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             positiveButton.setOnClickListener {
@@ -171,10 +115,100 @@ class AddFoodDialog(
             binding.addToDatabaseButton.visibility = if (insertUserAddedFood != null && !isAddToMealMode) View.VISIBLE else View.GONE
             binding.addToDatabaseButton.setOnClickListener { addCurrentFoodToDatabase() }
         }
-        
+
         return dialog
     }
-    
+
+    private fun setupBasicUI() {
+        val mealCategories = arrayOf("Breakfast", "Lunch", "Dinner", "Snacks")
+        val mealAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, mealCategories)
+        mealAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        binding.mealCategorySpinner.adapter = mealAdapter
+
+        searchAdapter = FoodSearchAdapter { result ->
+            selectFoodResult(result)
+        }
+        binding.searchResultsList.layoutManager = LinearLayoutManager(requireContext())
+        binding.searchResultsList.adapter = searchAdapter
+
+        binding.databaseToggle.setOnCheckedChangeListener { _, checkedId ->
+            useLocalDatabase = checkedId == binding.radioLocal.id
+            binding.filterContainer.visibility = if (useLocalDatabase && isDatabaseLoaded) View.VISIBLE else View.GONE
+            binding.searchStatus.text = if (useLocalDatabase) {
+                val count = if (isDatabaseLoaded) foodDatabaseHelper.getTotalFoodsCount() else 0
+                "Search from local database ($count foods)"
+            } else {
+                "Search USDA FoodData Central online"
+            }
+            binding.searchResultsList.visibility = View.GONE
+            searchAdapter.submitList(emptyList())
+        }
+
+        binding.searchButton.setOnClickListener {
+            performSearch()
+        }
+
+        binding.foodSearchEdit.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                performSearch()
+                true
+            } else {
+                false
+            }
+        }
+
+        binding.amountEdit.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                updateNutritionDisplay()
+            }
+        })
+
+        binding.servingSizeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (servingSizes.isNotEmpty() && position < servingSizes.size) {
+                    currentServingSize = servingSizes[position].label
+                    updateNutritionDisplay()
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        binding.toggleManualButton.setOnClickListener {
+            if (binding.manualEntrySection.visibility == View.GONE) {
+                binding.manualEntrySection.visibility = View.VISIBLE
+                binding.toggleManualButton.text = "Hide Manual Entry"
+            } else {
+                binding.manualEntrySection.visibility = View.GONE
+                binding.toggleManualButton.text = "Edit Nutrition Manually"
+            }
+        }
+
+        setupDefaultServingSize()
+    }
+
+    private fun showFilterLoadingState() {
+        val loadingAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, listOf("Loading..."))
+        loadingAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        binding.categoryFilterSpinner.adapter = loadingAdapter
+        binding.foodGroupFilterSpinner.adapter = loadingAdapter
+
+        binding.filterContainer.visibility = View.VISIBLE
+        binding.searchStatus.text = "Loading food database..."
+    }
+
+    private fun setupUIAfterDatabaseLoad() {
+        setupCategoryFilter()
+
+        binding.searchStatus.text = "Search from local database (${foodDatabaseHelper.getTotalFoodsCount()} foods)"
+        binding.filterContainer.visibility = View.VISIBLE
+
+        if (useLocalDatabase) {
+            binding.searchStatus.text = "Search from local database (${foodDatabaseHelper.getTotalFoodsCount()} foods)"
+        }
+    }
+
     private fun setupDefaultServingSize() {
         servingSizes = mutableListOf(
             ServingOption("1 serving", 100.0, 1.0),
@@ -184,53 +218,106 @@ class AddFoodDialog(
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         binding.servingSizeSpinner.adapter = adapter
     }
-    
+
     private fun setupCategoryFilter() {
+        // Setup categories for filter spinner
         val categories = mutableListOf("All Categories")
         categories.addAll(foodDatabaseHelper.getCategories())
-        
+
         val categoryAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, categories)
         categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         binding.categoryFilterSpinner.adapter = categoryAdapter
-        
+
         binding.categoryFilterSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                selectedCategory = categories[position]
+                selectedCategoryFilter = categories[position]
+                if (selectedFilterType == FilterType.CATEGORY && view != null) {
+                    performSearch()
+                }
             }
-            
             override fun onNothingSelected(parent: AdapterView<*>?) {
-                selectedCategory = "All Categories"
+                selectedCategoryFilter = "All Categories"
             }
         }
-        
-        // Update status text
-        binding.searchStatus.text = "Search from local database (${foodDatabaseHelper.getTotalFoodsCount()} foods)"
+
+        // Setup food groups for filter spinner
+        val foodGroups = mutableListOf("All Food Groups")
+        foodGroups.addAll(foodDatabaseHelper.getFoodGroups())
+
+        val foodGroupAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, foodGroups)
+        foodGroupAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        binding.foodGroupFilterSpinner.adapter = foodGroupAdapter
+
+        binding.foodGroupFilterSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                selectedFoodGroupFilter = foodGroups[position]
+                if (selectedFilterType == FilterType.FOOD_GROUP && view != null) {
+                    performSearch()
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {
+                selectedFoodGroupFilter = "All Food Groups"
+            }
+        }
+
+        // Setup filter type radio buttons
+        binding.radioCategoryFilter.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                selectedFilterType = FilterType.CATEGORY
+                binding.categoryFilterSpinner.visibility = View.VISIBLE
+                binding.foodGroupFilterSpinner.visibility = View.GONE
+                performSearch()
+            }
+        }
+
+        binding.radioFoodGroupFilter.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                selectedFilterType = FilterType.FOOD_GROUP
+                binding.categoryFilterSpinner.visibility = View.GONE
+                binding.foodGroupFilterSpinner.visibility = View.VISIBLE
+                performSearch()
+            }
+        }
     }
-    
+
     private fun performSearch() {
         val query = binding.foodSearchEdit.text.toString().trim()
-        if (query.isEmpty()) {
-            Toast.makeText(requireContext(), "Please enter a search term", Toast.LENGTH_SHORT).show()
+        if (query.isEmpty() && selectedCategoryFilter == "All Categories" && selectedFoodGroupFilter == "All Food Groups") {
+            Toast.makeText(requireContext(), "Please enter a search term or select a filter", Toast.LENGTH_SHORT).show()
             return
         }
-        
+
         binding.searchStatus.text = "Searching..."
         binding.searchButton.isEnabled = false
-        
+
         lifecycleScope.launch {
             try {
                 val results = if (useLocalDatabase) {
-                    searchLocalDatabase(query)
+                    val categoryFilter = if (selectedFilterType == FilterType.CATEGORY && selectedCategoryFilter != "All Categories") {
+                        selectedCategoryFilter
+                    } else null
+                    val foodGroupFilter = if (selectedFilterType == FilterType.FOOD_GROUP && selectedFoodGroupFilter != "All Food Groups") {
+                        selectedFoodGroupFilter
+                    } else null
+
+                    foodDatabaseHelper.searchFoods(query, categoryFilter, foodGroupFilter, MAX_VALUE)
                 } else {
                     searchUSDADatabase(query)
                 }
-                
+
                 if (results.isEmpty()) {
                     binding.searchStatus.text = "No results found"
                     binding.searchResultsList.visibility = View.GONE
                 } else {
+                    val filterInfo = when {
+                        selectedFilterType == FilterType.CATEGORY && selectedCategoryFilter != "All Categories" ->
+                            " in category: $selectedCategoryFilter"
+                        selectedFilterType == FilterType.FOOD_GROUP && selectedFoodGroupFilter != "All Food Groups" ->
+                            " in group: $selectedFoodGroupFilter"
+                        else -> ""
+                    }
                     val source = if (useLocalDatabase) "local" else "USDA"
-                    binding.searchStatus.text = "${results.size} results from $source - tap to select"
+                    binding.searchStatus.text = "${results.size} results from $source$filterInfo - tap to select"
                     searchAdapter.submitList(results)
                     binding.searchResultsList.visibility = View.VISIBLE
                 }
@@ -241,22 +328,28 @@ class AddFoodDialog(
                 binding.searchButton.isEnabled = true
             }
         }
+
     }
-    
+
     private suspend fun searchLocalDatabase(query: String): List<FoodSearchResult> = withContext(Dispatchers.Default) {
-        val results = if (selectedCategory != "All Categories") {
-            // First filter by category, then search
-            val categoryResults = foodDatabaseHelper.searchByCategory(selectedCategory, 100)
-            val queryLower = query.lowercase()
-            categoryResults.filter { 
-                it.description.lowercase().contains(queryLower) 
-            }.take(20)
-        } else {
-            foodDatabaseHelper.searchFoods(query, 20)
-        }
-        results
+        val limit = MAX_VALUE
+
+        val categoryFilter = if (selectedFilterType == FilterType.CATEGORY && selectedCategoryFilter != "All Categories") {
+            selectedCategoryFilter
+        } else null
+
+        val foodGroupFilter = if (selectedFilterType == FilterType.FOOD_GROUP && selectedFoodGroupFilter != "All Food Groups") {
+            selectedFoodGroupFilter
+        } else null
+
+        foodDatabaseHelper.searchFoods(
+            query = query,
+            categoryFilter = categoryFilter,
+            foodGroupFilter = foodGroupFilter,
+            limit = limit
+        )
     }
-    
+
     private suspend fun searchUSDADatabase(query: String): List<FoodSearchResult> = withContext(Dispatchers.IO) {
         if (usdaApiKey.isBlank()) return@withContext emptyList()
         val url = "https://api.nal.usda.gov/fdc/v1/foods/search?query=${java.net.URLEncoder.encode(query, "UTF-8")}&pageSize=15&dataType=Foundation,SR%20Legacy,Branded&api_key=$usdaApiKey"
@@ -264,24 +357,24 @@ class AddFoodDialog(
         val response = URL(url).readText()
         val json = JSONObject(response)
         val foods = json.optJSONArray("foods") ?: return@withContext emptyList()
-        
+
         val results = mutableListOf<FoodSearchResult>()
-        
+
         for (i in 0 until foods.length()) {
             val food = foods.getJSONObject(i)
-            
+
             var calories = 0.0
             var protein = 0.0
             var carbs = 0.0
             var fat = 0.0
-            
+
             val nutrients = food.optJSONArray("foodNutrients")
             if (nutrients != null) {
                 for (j in 0 until nutrients.length()) {
                     val nutrient = nutrients.getJSONObject(j)
                     val nutrientId = nutrient.optInt("nutrientId", 0)
                     val value = nutrient.optDouble("value", 0.0)
-                    
+
                     when (nutrientId) {
                         1008 -> calories = value  // Energy (kcal)
                         1003 -> protein = value   // Protein
@@ -290,7 +383,7 @@ class AddFoodDialog(
                     }
                 }
             }
-            
+
             results.add(
                 FoodSearchResult(
                     fdcId = food.optInt("fdcId", 0),
@@ -305,17 +398,17 @@ class AddFoodDialog(
                 )
             )
         }
-        
+
         results
     }
-    
+
     private fun selectFoodResult(result: FoodSearchResult) {
         // Fill in the form with the selected food data
         binding.foodNameEdit.setText(result.description)
-        
+
         // Store selected food with all nutrients (per 100g)
         selectedFood = result
-        
+
         // Use serving sizes from database if available
         if (result.servingSizes.isNotEmpty()) {
             servingSizes = result.servingSizes.map { ss ->
@@ -330,53 +423,53 @@ class AddFoodDialog(
             // Fallback for USDA or other sources without serving sizes
             val servingDesc = result.servingUnit ?: "1 serving"
             val servingGrams = result.servingSize ?: 100.0
-            
+
             servingSizes = mutableListOf(
                 ServingOption("$servingDesc - ${servingGrams.toInt()}g", servingGrams, servingGrams / 100.0)
             )
-            
+
             // Add 100g option if different
             if (servingGrams != 100.0) {
                 servingSizes.add(ServingOption("100g", 100.0, 1.0))
             }
-            
+
             // Add gram option for custom amounts
             servingSizes.add(ServingOption("g (enter amount)", 1.0, 0.01))
         }
-        
+
         // Update serving size spinner
         val servingLabels = servingSizes.map { it.label }
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, servingLabels)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         binding.servingSizeSpinner.adapter = adapter
-        
+
         currentServingSize = servingSizes[0].label
-        
+
         // Reset amount to 1
         binding.amountEdit.setText("1")
-        
+
         // Update nutrition display
         updateNutritionDisplay()
-        
+
         // Update manual entry fields (for the primary serving)
         val primaryMultiplier = if (servingSizes.isNotEmpty()) servingSizes[0].multiplier else 1.0
         binding.caloriesEdit.setText((result.calories * primaryMultiplier).toInt().toString())
         binding.proteinEdit.setText(String.format("%.1f", result.protein * primaryMultiplier))
         binding.carbsEdit.setText(String.format("%.1f", result.carbs * primaryMultiplier))
         binding.fatEdit.setText(String.format("%.1f", result.fat * primaryMultiplier))
-        
+
         // Hide search results after selection
         binding.searchResultsList.visibility = View.GONE
         binding.searchStatus.text = "Selected: ${result.description}"
         binding.selectedFoodLabel.text = result.description
-        
+
         Toast.makeText(requireContext(), "Food selected", Toast.LENGTH_SHORT).show()
     }
-    
+
     private fun updateNutritionDisplay() {
         val food = selectedFood ?: return
         val amount = binding.amountEdit.text.toString().toDoubleOrNull() ?: 1.0
-        
+
         // Find the selected serving option
         val selectedIndex = binding.servingSizeSpinner.selectedItemPosition
         val multiplier = if (servingSizes.isNotEmpty() && selectedIndex < servingSizes.size) {
@@ -384,20 +477,20 @@ class AddFoodDialog(
         } else {
             1.0
         }
-        
+
         // Calculate nutrition based on amount and serving size
         val totalCalories = (food.calories * multiplier * amount).toInt()
         val totalProtein = food.protein * multiplier * amount
         val totalCarbs = food.carbs * multiplier * amount
         val totalFat = food.fat * multiplier * amount
-        
+
         // Update nutrition display
         binding.nutritionCalories.text = totalCalories.toString()
         binding.nutritionProtein.text = String.format("%.1fg", totalProtein)
         binding.nutritionCarbs.text = String.format("%.1fg", totalCarbs)
         binding.nutritionFat.text = String.format("%.1fg", totalFat)
     }
-    
+
     private fun buildCurrentFoodEntry(dateMillis: Long): FoodEntry? {
         val selectedPosition = binding.mealCategorySpinner.selectedItemPosition
         val mealCategories = arrayOf("Breakfast", "Lunch", "Dinner", "Snacks")
@@ -660,7 +753,7 @@ class AddFoodDialog(
             .setNegativeButton("Cancel", null)
             .show()
     }
-    
+
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null

@@ -5,7 +5,8 @@ import android.app.DatePickerDialog
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
-import android.widget.DatePicker
+import android.widget.EditText
+import android.widget.NumberPicker
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.copdhealthtracker.databinding.ActivityHipaaAuthorizationBinding
@@ -40,6 +41,7 @@ class HipaaAuthorizationActivity : AppCompatActivity() {
         binding.hipaaRevoke.setOnClickListener { confirmRevoke() }
         binding.hipaaDob.setOnClickListener { showDobPicker() }
         binding.healthInfoExpiresDate.setOnClickListener { showExpiryDatePicker() }
+        binding.hipaaSignatureClear.setOnClickListener { binding.hipaaSignaturePad.clear() }
         binding.healthInfoExpiresGroup.setOnCheckedChangeListener { _, _ -> updateExpiryDateVisibility() }
         binding.healthInfoExpires1year.isChecked = true
     }
@@ -54,6 +56,7 @@ class HipaaAuthorizationActivity : AppCompatActivity() {
         binding.hipaaAgree.visibility = View.VISIBLE
         binding.hipaaPrintedNameLayout.visibility = View.VISIBLE
         binding.hipaaDobLayout.visibility = View.VISIBLE
+        binding.hipaaSignatureLayout.visibility = View.VISIBLE
         binding.healthInfoConsentTitle.visibility = View.VISIBLE
         binding.healthInfoConsentBody.visibility = View.VISIBLE
         binding.healthInfoExpiresLabel.visibility = View.VISIBLE
@@ -72,6 +75,7 @@ class HipaaAuthorizationActivity : AppCompatActivity() {
         binding.hipaaAgree.visibility = View.GONE
         binding.hipaaPrintedNameLayout.visibility = View.GONE
         binding.hipaaDobLayout.visibility = View.GONE
+        binding.hipaaSignatureLayout.visibility = View.GONE
         binding.healthInfoConsentTitle.visibility = View.GONE
         binding.healthInfoConsentBody.visibility = View.GONE
         binding.healthInfoExpiresLabel.visibility = View.GONE
@@ -92,6 +96,7 @@ class HipaaAuthorizationActivity : AppCompatActivity() {
         binding.hipaaAgree.visibility = View.VISIBLE
         binding.hipaaPrintedNameLayout.visibility = View.VISIBLE
         binding.hipaaDobLayout.visibility = View.VISIBLE
+        binding.hipaaSignatureLayout.visibility = View.VISIBLE
         binding.healthInfoConsentTitle.visibility = View.VISIBLE
         binding.healthInfoConsentBody.visibility = View.VISIBLE
         binding.healthInfoExpiresLabel.visibility = View.VISIBLE
@@ -114,25 +119,81 @@ class HipaaAuthorizationActivity : AppCompatActivity() {
 
     private fun showDobPicker() {
         val cal = Calendar.getInstance()
+        val maxDayForMonth = { m: Int, y: Int ->
+            val c = Calendar.getInstance()
+            c.set(y, m - 1, 1)
+            c.getActualMaximum(Calendar.DAY_OF_MONTH)
+        }
+        val maxYear = Calendar.getInstance().get(Calendar.YEAR)
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_dob_picker, null)
-        val picker = view.findViewById<DatePicker>(R.id.dob_date_picker)
-        picker.init(
-            cal.get(Calendar.YEAR),
-            cal.get(Calendar.MONTH),
-            cal.get(Calendar.DAY_OF_MONTH),
-            null
-        )
-        picker.minDate = Calendar.getInstance().apply { set(1900, Calendar.JANUARY, 1) }.timeInMillis
-        picker.maxDate = cal.timeInMillis
-        AlertDialog.Builder(this)
+        val monthPicker = view.findViewById<NumberPicker>(R.id.dob_month)
+        val dayPicker = view.findViewById<NumberPicker>(R.id.dob_day)
+        val yearEdit = view.findViewById<EditText>(R.id.dob_year)
+        monthPicker.minValue = 1
+        monthPicker.maxValue = 12
+        monthPicker.wrapSelectorWheel = false
+        dayPicker.minValue = 1
+        dayPicker.maxValue = 31
+        dayPicker.wrapSelectorWheel = false
+        val existingDob = binding.hipaaDob.text?.toString()?.trim()
+        if (!existingDob.isNullOrEmpty()) {
+            try {
+                val parsed = dateFormat.parse(existingDob)
+                if (parsed != null) {
+                    cal.time = parsed
+                    monthPicker.value = cal.get(Calendar.MONTH) + 1
+                    dayPicker.value = cal.get(Calendar.DAY_OF_MONTH)
+                    yearEdit.setText(cal.get(Calendar.YEAR).toString())
+                }
+            } catch (_: Exception) { }
+        }
+        if (yearEdit.text.isNullOrEmpty()) {
+            yearEdit.setText(cal.get(Calendar.YEAR).toString())
+            monthPicker.value = cal.get(Calendar.MONTH) + 1
+            dayPicker.value = cal.get(Calendar.DAY_OF_MONTH)
+        }
+        val initialYear = yearEdit.text.toString().toIntOrNull()?.coerceIn(1900, maxYear) ?: maxYear
+        dayPicker.maxValue = maxDayForMonth(monthPicker.value, initialYear)
+        if (dayPicker.value > dayPicker.maxValue) dayPicker.value = dayPicker.maxValue
+        monthPicker.setOnValueChangedListener { _, _, newMonth ->
+            val y = yearEdit.text.toString().toIntOrNull() ?: maxYear
+            dayPicker.maxValue = maxDayForMonth(newMonth, y.coerceIn(1900, maxYear))
+            if (dayPicker.value > dayPicker.maxValue) dayPicker.value = dayPicker.maxValue
+        }
+        yearEdit.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                val y = yearEdit.text.toString().toIntOrNull() ?: return@setOnFocusChangeListener
+                dayPicker.maxValue = maxDayForMonth(monthPicker.value, y.coerceIn(1900, maxYear))
+                if (dayPicker.value > dayPicker.maxValue) dayPicker.value = dayPicker.maxValue
+            }
+        }
+        val dialog = AlertDialog.Builder(this)
             .setTitle(R.string.health_info_consent_dob_hint)
             .setView(view)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                cal.set(picker.year, picker.month, picker.dayOfMonth)
-                binding.hipaaDob.setText(dateFormat.format(cal.time))
-            }
+            .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val yearStr = yearEdit.text.toString().trim()
+                val year = yearStr.toIntOrNull()
+                if (year == null || year < 1900 || year > maxYear) {
+                    Toast.makeText(
+                        this,
+                        getString(R.string.dob_dialog_invalid, maxYear),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@setOnClickListener
+                }
+                val month = monthPicker.value
+                val maxDay = maxDayForMonth(month, year)
+                val day = dayPicker.value.coerceIn(1, maxDay)
+                cal.set(year, month - 1, day)
+                binding.hipaaDob.setText(dateFormat.format(cal.time))
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
     }
 
     private fun showExpiryDatePicker() {
@@ -166,6 +227,11 @@ class HipaaAuthorizationActivity : AppCompatActivity() {
         val dob = binding.hipaaDob.text?.toString()?.trim().orEmpty()
         if (dob.isEmpty()) {
             binding.hipaaError.text = getString(R.string.health_info_consent_dob_required)
+            binding.hipaaError.visibility = View.VISIBLE
+            return
+        }
+        if (binding.hipaaSignaturePad.isEmpty()) {
+            binding.hipaaError.text = getString(R.string.health_info_consent_signature_required)
             binding.hipaaError.visibility = View.VISIBLE
             return
         }

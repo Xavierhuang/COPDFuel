@@ -10,8 +10,8 @@ import com.copdhealthtracker.data.dao.*
 import com.copdhealthtracker.data.model.*
 
 @Database(
-    entities = [FoodEntry::class, ExerciseEntry::class, OxygenReading::class, WeightEntry::class, Medication::class, WaterEntry::class, FavoriteFood::class, UserAddedFood::class, FavoriteMeal::class, FavoriteMealItem::class],
-    version = 7,
+    entities = [FoodEntry::class, ExerciseEntry::class, OxygenReading::class, WeightEntry::class, Medication::class, WaterEntry::class, FavoriteFood::class, UserAddedFood::class, FavoriteMeal::class, FavoriteMealItem::class, StepsEntry::class, HeartRateEntry::class],
+    version = 10,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -25,6 +25,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun weightDao(): WeightDao
     abstract fun medicationDao(): MedicationDao
     abstract fun waterDao(): WaterDao
+    abstract fun stepsDao(): StepsDao
+    abstract fun heartRateDao(): HeartRateDao
 
     companion object {
         @Volatile
@@ -197,6 +199,37 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS steps_entries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        count INTEGER NOT NULL,
+                        date INTEGER NOT NULL
+                    )
+                """)
+            }
+        }
+
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS heart_rate_entries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        bpm INTEGER NOT NULL,
+                        date INTEGER NOT NULL
+                    )
+                """)
+            }
+        }
+
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE medications ADD COLUMN isDiscontinued INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE medications ADD COLUMN discontinuedDate INTEGER")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -204,7 +237,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "copd_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                 .build()
                 INSTANCE = instance
                 instance

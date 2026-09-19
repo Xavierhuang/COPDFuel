@@ -3,6 +3,7 @@ package com.copdhealthtracker.utils
 import android.app.Application
 import com.copdhealthtracker.auth.CopdAuth
 import com.copdhealthtracker.api.CopdApiClient
+import com.copdhealthtracker.billing.BillingManager
 import com.copdhealthtracker.data.AppDatabase
 import com.copdhealthtracker.repository.DataRepository
 
@@ -11,6 +12,7 @@ class AppApplication : Application() {
     val repository by lazy { DataRepository(database) }
     val copdAuth by lazy { CopdAuth(this) }
     val apiClient by lazy { CopdApiClient() }
+    val billingManager by lazy { BillingManager(this) }
     
     companion object {
         @Volatile

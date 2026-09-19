@@ -11,6 +11,10 @@ interface OxygenDao {
     
     @Query("SELECT * FROM oxygen_readings WHERE date BETWEEN :startDate AND :endDate ORDER BY date DESC")
     fun getReadingsByDateRange(startDate: Long, endDate: Long): Flow<List<OxygenReading>>
+
+    /** Health Connect re-imports the same samples; skip if this instant is already stored. */
+    @Query("SELECT COUNT(*) FROM oxygen_readings WHERE date = :dateMillis")
+    suspend fun countAtInstant(dateMillis: Long): Int
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReading(reading: OxygenReading): Long

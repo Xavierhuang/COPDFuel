@@ -10,22 +10,38 @@ if (localPropertiesFile.exists()) {
     localPropertiesFile.withReader("UTF-8") { reader -> localProperties.load(reader) }
 }
 
+def releaseKeystorePath = localProperties.getProperty("RELEASE_STORE_FILE")
+def hasReleaseSigning = releaseKeystorePath != null && !releaseKeystorePath.isEmpty() && new File(releaseKeystorePath).exists()
+
 android {
     namespace 'com.copdhealthtracker'
-    compileSdk 34
+    compileSdk 36
+
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(releaseKeystorePath)
+                storePassword localProperties.getProperty("RELEASE_STORE_PASSWORD", "")
+                keyAlias localProperties.getProperty("RELEASE_KEY_ALIAS", "")
+                keyPassword localProperties.getProperty("RELEASE_KEY_PASSWORD", "")
+            }
+        }
+    }
 
     defaultConfig {
         applicationId "com.copdhealthtracker"
-        minSdk 24
-        targetSdk 34
-        versionCode 1
-        versionName "1.0.0"
+        minSdk 26
+        targetSdk 36
+        versionCode 9
+        versionName "1.0.7"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "String", "API_BASE_URL", "\"https://d2gfwfsr2a.execute-api.us-east-2.amazonaws.com\""
-        buildConfigField "String", "PRIVACY_POLICY_URL", "\"https://xavierhuang.github.io/COPDFuel/privacy.html\""
+        buildConfigField "String", "PRIVACY_POLICY_URL", "\"https://www.copdfuel.com/privacy.html\""
+        buildConfigField "String", "TERMS_OF_USE_URL", "\"https://www.copdfuel.com/terms.html\""
         buildConfigField "String", "GOOGLE_PLACES_API_KEY", "\"${localProperties.getProperty("GOOGLE_PLACES_API_KEY", "")}\""
         buildConfigField "String", "USDA_FDC_API_KEY", "\"${localProperties.getProperty("USDA_FDC_API_KEY", "")}\""
+        buildConfigField "String", "SUBSCRIPTION_PRODUCT_ID", "\"copdfuel_premium_monthly\""
         
         kapt {
             arguments {
@@ -36,6 +52,9 @@ android {
 
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
@@ -87,6 +106,14 @@ dependencies {
     
     // Location services
     implementation 'com.google.android.gms:play-services-location:21.0.1'
+
+    // Health Connect (device data: SpO2 from watch/phone) - requires API 26+ at runtime
+    implementation 'androidx.health.connect:connect-client:1.1.0-alpha10'
+    
+    // Google Play Billing (in-app subscription)
+    // billing-ktx is intentionally omitted: we use the callback API, not its suspend
+    // extensions, and it drags in Kotlin 2.x metadata this project's compiler can't read.
+    implementation 'com.android.billingclient:billing:9.1.0'
     
     // Cognito User Pools (auth)
     implementation 'com.amazonaws:aws-android-sdk-auth-userpools:2.81.1'

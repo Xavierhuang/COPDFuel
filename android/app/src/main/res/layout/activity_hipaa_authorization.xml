@@ -96,6 +96,48 @@
                     android:maxLines="1" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <LinearLayout
+            android:id="@+id/hipaa_signature_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="16dp">
+
+            <TextView
+                android:id="@+id/hipaa_signature_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/health_info_consent_signature_label"
+                android:textSize="14sp"
+                android:textColor="?android:attr/textColorSecondary"
+                android:layout_marginBottom="4dp" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="160dp"
+                android:background="@drawable/input_background"
+                android:padding="8dp">
+
+                <com.copdhealthtracker.ui.views.SignaturePad
+                    android:id="@+id/hipaa_signature_pad"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/hipaa_signature_clear"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/health_info_consent_signature_clear"
+            android:textSize="12sp"
+            android:textColor="?attr/colorPrimary"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginBottom="8dp" />
+        </LinearLayout>
+
         <TextView
             android:id="@+id/health_info_expires_label"
             android:layout_width="wrap_content"

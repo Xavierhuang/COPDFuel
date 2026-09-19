@@ -5,10 +5,14 @@ import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.copdhealthtracker.databinding.ActivityMainBinding
 import com.copdhealthtracker.utils.AppApplication
+import com.copdhealthtracker.utils.HipaaGate
 import com.copdhealthtracker.ui.fragments.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -26,6 +30,8 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        applySystemBarInsets()
+
         if (savedInstanceState == null) {
             replaceFragment(HomeFragment())
             setActiveTab(0)
@@ -35,12 +41,40 @@ class MainActivity : AppCompatActivity() {
         registerAndSyncIfLoggedIn()
     }
 
+    private fun applySystemBarInsets() {
+        val bottomNav = binding.bottomNavigation
+        val initialBottomPadding = bottomNav.paddingBottom
+        val initialTopPadding = bottomNav.paddingTop
+
+        ViewCompat.setOnApplyWindowInsetsListener(bottomNav) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+            v.updatePadding(
+                top = initialTopPadding,
+                bottom = if (ime.bottom > 0) initialBottomPadding else initialBottomPadding + systemBars.bottom
+            )
+            insets
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+            v.updatePadding(bottom = ime.bottom)
+            insets
+        }
+    }
+
     private fun registerAndSyncIfLoggedIn() {
         val app = application as AppApplication
         lifecycleScope.launch {
             val token = suspendCancellableCoroutine<String?> { cont ->
                 app.copdAuth.getIdToken { r -> cont.resume(r.getOrNull()) }
             } ?: return@launch
+            // HIPAA gate: do not transmit any patient data to the backend
+            // without signed consent. The login bootstrap (putMe with empty
+            // email) is skipped too, since the next login after the user
+            // signs HIPAA will re-run this whole block. See HipaaGate +
+            // project memory "HIPAA consent required before any data sharing".
+            if (!HipaaGate.hasConsent(this@MainActivity)) return@launch
             withContext(Dispatchers.IO) {
                 val weights = app.repository.getAllWeights().first()
                 val medications = app.repository.getAllMedications().first()

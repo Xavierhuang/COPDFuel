@@ -20,8 +20,11 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
 import com.copdhealthtracker.R
+import com.copdhealthtracker.data.model.Medication
 import com.copdhealthtracker.databinding.FragmentResourcesBinding
+import com.copdhealthtracker.ui.dialogs.AddMedicationDialog
 import com.copdhealthtracker.utils.AppApplication
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -30,6 +33,9 @@ class ResourcesFragment : Fragment() {
     private var _binding: FragmentResourcesBinding? = null
     private val binding get() = _binding!!
     private var selectedToolIndex = 0
+    private var isEditingInstructions = false
+    private var isEditingExerciseJournal = false
+    private val contentJobs = mutableListOf<Job>()
 
     private data class ToolInfo(
         val name: String,
@@ -37,10 +43,10 @@ class ResourcesFragment : Fragment() {
     )
 
     private val tools = listOf(
-        ToolInfo("Severity\nAssessment", R.drawable.ic_tool_severity),
-        ToolInfo("Exacerbation\nPlan", R.drawable.ic_tool_exacerbation),
+        ToolInfo("Severity\nEval", R.drawable.ic_tool_severity),
+        ToolInfo("COPD\nExacerb.", R.drawable.ic_tool_exacerbation),
         ToolInfo("Pulmonary\nRehab", R.drawable.ic_tool_pulmonary),
-        ToolInfo("Medication\nGuide", R.drawable.ic_tool_medication),
+        ToolInfo("Resp.\nCare", R.drawable.ic_tool_medication),
         ToolInfo("Resource\nHub", R.drawable.ic_tool_resources)
     )
 
@@ -55,8 +61,16 @@ class ResourcesFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        savedInstanceState?.getInt(KEY_SELECTED_TOOL_INDEX, selectedToolIndex)?.let {
+            selectedToolIndex = it
+        }
         setupToolCards()
-        showContentForTool(0)
+        showContentForTool(selectedToolIndex)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(KEY_SELECTED_TOOL_INDEX, selectedToolIndex)
     }
 
     private fun setupToolCards() {
@@ -110,6 +124,10 @@ class ResourcesFragment : Fragment() {
     }
 
     private fun showContentForTool(index: Int) {
+        // Cancel any long-running collectors started by the previous tab's content
+        // so we don't leak them across tab switches (was causing OOM under churn).
+        contentJobs.forEach { it.cancel() }
+        contentJobs.clear()
         binding.resourcesContentContainer.removeAllViews()
         when (index) {
             0 -> buildSeverityContent()
@@ -136,7 +154,7 @@ class ResourcesFragment : Fragment() {
 
         // Disclaimer
         binding.resourcesContentContainer.addView(TextView(ctx).apply {
-            text = "This tool provides an estimate of COPD severity based on your answers. It is not a substitute for professional medical assessment. Always consult with your healthcare provider for an accurate diagnosis and treatment plan."
+            text = "This screen summarizes information you enter for your own tracking. It does not provide medical advice, diagnosis, or treatment recommendations."
             textSize = 14f
             setTextColor(secondaryTextColor)
             setBackgroundColor(ContextCompat.getColor(ctx, R.color.cardBackgroundBlue))
@@ -179,7 +197,7 @@ class ResourcesFragment : Fragment() {
         addRow("Do you use supplemental oxygen?", oxygenStr, oxygenOptions) { oxygenStr = it }
 
         val calcBtn = Button(ctx).apply {
-            text = "Calculate Severity"
+            text = "Save Summary"
             setBackgroundColor(ContextCompat.getColor(ctx, R.color.colorPrimary))
             setTextColor(ContextCompat.getColor(ctx, android.R.color.white))
             setOnClickListener {
@@ -194,47 +212,27 @@ class ResourcesFragment : Fragment() {
                 val flares = when (flareStr) { "0" -> 0; "1" -> 1; "2" -> 2; "3 or more" -> 3; else -> null }
                 val oxy = oxygenStr == "Yes"
 
-                val severity = when {
-                    fev1 != null -> when {
-                        fev1 >= 80 -> "Mild COPD (GOLD 1)"
-                        fev1 >= 50 -> "Moderate COPD (GOLD 2)"
-                        fev1 >= 30 -> "Severe COPD (GOLD 3)"
-                        else -> "Very Severe COPD (GOLD 4)"
-                    }
-                    oxy -> "Severe COPD"
-                    hosp != null && hosp >= 1 -> "Severe COPD"
-                    flares != null && flares >= 2 -> "Moderate COPD"
-                    else -> "Please answer the questions above to calculate severity"
+                val summaryLines = buildList {
+                    add("FEV1: $fev1Str")
+                    add("Hospitalizations (past year): $hospStr")
+                    add("Flare-ups (past year): $flareStr")
+                    add("Uses supplemental oxygen: ${if (oxy) "Yes" else "No"}")
                 }
-                val desc = when {
-                    severity.contains("Mild") -> "FEV1 >= 80% predicted. You may have mild symptoms or be asymptomatic. Regular monitoring and lifestyle modifications are recommended."
-                    severity.contains("Moderate") && severity.contains("GOLD 2") -> "FEV1 50-79% predicted. Shortness of breath typically develops on exertion. Bronchodilators and pulmonary rehabilitation may help."
-                    severity.contains("Severe") && severity.contains("GOLD 3") -> "FEV1 30-49% predicted. Shortness of breath worsens and may limit daily activities. More intensive treatment is typically needed."
-                    severity.contains("Very Severe") -> "FEV1 < 30% predicted. Quality of life is significantly impaired. Comprehensive treatment and close monitoring are essential."
-                    severity.contains("Severe") -> "Based on your responses, you may have severe COPD. Please consult with your healthcare provider for proper evaluation."
-                    severity.contains("Moderate") -> "Based on your responses, you may have moderate COPD. Please consult with your healthcare provider for proper evaluation."
-                    else -> ""
-                }
-                if (desc.isNotEmpty()) {
-                    resultView?.text = "$severity\n\n$desc"
-                    resultView?.visibility = View.VISIBLE
-                    
-                    // Save severity assessment to SharedPreferences for report generation
-                    val prefs = PreferenceManager.getDefaultSharedPreferences(ctx)
-                    val dateFormat = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault())
-                    prefs.edit()
-                        .putString("severity_fev1", fev1Str)
-                        .putString("severity_hospitalizations", hospStr)
-                        .putString("severity_exacerbations", flareStr)
-                        .putString("severity_oxygen", oxygenStr)
-                        .putString("severity_result", severity)
-                        .putString("severity_description", desc)
-                        .putString("severity_assessment_date", dateFormat.format(java.util.Date()))
-                        .apply()
-                } else {
-                    resultView?.text = severity
-                    resultView?.visibility = View.VISIBLE
-                }
+                resultView?.text = "Saved summary:\n\n" + summaryLines.joinToString("\n")
+                resultView?.visibility = View.VISIBLE
+
+                // Save answers (for reports / personal tracking)
+                val prefs = PreferenceManager.getDefaultSharedPreferences(ctx)
+                val dateFormat = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault())
+                prefs.edit()
+                    .putString("severity_fev1", fev1Str)
+                    .putString("severity_hospitalizations", hospStr)
+                    .putString("severity_exacerbations", flareStr)
+                    .putString("severity_oxygen", oxygenStr)
+                    .putString("severity_result", "Tracking summary (not a medical assessment)")
+                    .putString("severity_description", "Saved for your personal tracking and to discuss with your clinician.")
+                    .putString("severity_assessment_date", dateFormat.format(java.util.Date()))
+                    .apply()
             }
         }
         binding.resourcesContentContainer.addView(calcBtn)
@@ -261,6 +259,29 @@ class ResourcesFragment : Fragment() {
         val cardBgColor = ContextCompat.getColor(ctx, R.color.cardBackgroundBlue)
         val density = resources.displayMetrics.density
 
+        // One-time migration: pull latest action_plans_list entry into legacy keys, then clear it.
+        val listJson = prefs.getString("action_plans_list", null)
+        if (listJson != null) {
+            try {
+                val arr = org.json.JSONArray(listJson)
+                if (arr.length() > 0) {
+                    val obj = arr.getJSONObject(arr.length() - 1)
+                    prefs.edit()
+                        .putString("doctor_name", obj.optString("doctorName", prefs.getString("doctor_name", "") ?: ""))
+                        .putString("doctor_phone", obj.optString("doctorPhone", prefs.getString("doctor_phone", "") ?: ""))
+                        .putString("emergency_contact_name", obj.optString("emergencyName", prefs.getString("emergency_contact_name", "") ?: ""))
+                        .putString("emergency_contact_phone", obj.optString("emergencyPhone", prefs.getString("emergency_contact_phone", "") ?: ""))
+                        .putString("action_plan_instructions", obj.optString("instructions", prefs.getString("action_plan_instructions", "") ?: ""))
+                        .remove("action_plans_list")
+                        .apply()
+                } else {
+                    prefs.edit().remove("action_plans_list").apply()
+                }
+            } catch (_: Exception) {
+                prefs.edit().remove("action_plans_list").apply()
+            }
+        }
+
         // Title
         container.addView(TextView(ctx).apply {
             text = "COPD Exacerbation Action Plan"
@@ -272,7 +293,7 @@ class ResourcesFragment : Fragment() {
 
         // Disclaimer
         container.addView(TextView(ctx).apply {
-            text = "This action plan should be created in partnership with your healthcare provider. Use this template to document your personalized plan for managing COPD flare-ups."
+            text = "This care plan should be created in partnership with your healthcare provider. Use this template to document your personalized plan for managing COPD flare-ups."
             textSize = 14f
             setTextColor(secondaryTextColor)
             setBackgroundColor(cardBgColor)
@@ -283,7 +304,7 @@ class ResourcesFragment : Fragment() {
             ).apply { bottomMargin = (24 * density).toInt() }
         })
 
-        // Important Contacts Section
+        // ============ IMPORTANT CONTACTS (top) ============
         container.addView(TextView(ctx).apply {
             text = "Important Contacts"
             textSize = 20f
@@ -292,7 +313,6 @@ class ResourcesFragment : Fragment() {
             setPadding(0, 0, 0, 16)
         })
 
-        // Contact input fields
         fun addContactField(label: String, prefKey: String, hint: String): android.widget.EditText {
             container.addView(TextView(ctx).apply {
                 text = label
@@ -319,6 +339,25 @@ class ResourcesFragment : Fragment() {
         val emergencyNameField = addContactField("Emergency Contact Name", "emergency_contact_name", "Jane Doe")
         val emergencyPhoneField = addContactField("Emergency Contact Phone", "emergency_contact_phone", "(555) 987-6543")
 
+        container.addView(Button(ctx).apply {
+            text = "Save Contacts"
+            setBackgroundColor(primaryColor)
+            setTextColor(ContextCompat.getColor(ctx, android.R.color.white))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (24 * density).toInt() }
+            setOnClickListener {
+                prefs.edit()
+                    .putString("doctor_name", doctorNameField.text.toString())
+                    .putString("doctor_phone", doctorPhoneField.text.toString())
+                    .putString("emergency_contact_name", emergencyNameField.text.toString())
+                    .putString("emergency_contact_phone", emergencyPhoneField.text.toString())
+                    .apply()
+                android.widget.Toast.makeText(ctx, "Contacts saved", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        })
+
         // Medication Plan Section
         container.addView(TextView(ctx).apply {
             text = "Medication Plan"
@@ -328,6 +367,41 @@ class ResourcesFragment : Fragment() {
             setPadding(0, 16, 0, 16)
         })
 
+        // Helper to render a med row with a delete button
+        fun renderMedRow(parent: LinearLayout, med: Medication) {
+            val row = LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, 4, 0, 4)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+            row.addView(TextView(ctx).apply {
+                text = "${med.name} - ${med.dosage} (${med.frequency})"
+                textSize = 14f
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            })
+            row.addView(TextView(ctx).apply {
+                text = "Delete"
+                textSize = 12f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(ContextCompat.getColor(ctx, android.R.color.holo_red_dark))
+                setPadding(16, 4, 4, 4)
+                setOnClickListener {
+                    androidx.appcompat.app.AlertDialog.Builder(ctx)
+                        .setTitle("Delete medication?")
+                        .setMessage("${med.name} will be removed.")
+                        .setPositiveButton("Delete") { _, _ ->
+                            lifecycleScope.launch { repo.deleteMedication(med) }
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                }
+            })
+            parent.addView(row)
+        }
+
         // Daily Medications
         container.addView(TextView(ctx).apply {
             text = "Daily Medications"
@@ -335,16 +409,34 @@ class ResourcesFragment : Fragment() {
             setTypeface(null, android.graphics.Typeface.BOLD)
             setPadding(0, 0, 0, 8)
         })
-        val dailyList = LinearLayout(ctx).apply { 
-            orientation = LinearLayout.VERTICAL 
+        val dailyList = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(cardBgColor)
             setPadding(16, 16, 16, 16)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = (16 * density).toInt() }
+            ).apply { bottomMargin = (8 * density).toInt() }
         }
         container.addView(dailyList)
+
+        container.addView(Button(ctx).apply {
+            text = "+ Add Daily Medication"
+            isAllCaps = false
+            isSingleLine = false
+            ellipsize = null
+            setBackgroundColor(primaryColor)
+            setTextColor(ContextCompat.getColor(ctx, android.R.color.white))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (16 * density).toInt() }
+            setOnClickListener {
+                AddMedicationDialog(defaultType = "daily") { med ->
+                    lifecycleScope.launch { repo.insertMedication(med) }
+                }.show(parentFragmentManager, "AddDailyMed")
+            }
+        })
 
         // Exacerbation Medications
         container.addView(TextView(ctx).apply {
@@ -353,53 +445,64 @@ class ResourcesFragment : Fragment() {
             setTypeface(null, android.graphics.Typeface.BOLD)
             setPadding(0, 0, 0, 8)
         })
-        val exacerbList = LinearLayout(ctx).apply { 
+        val exacerbList = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(cardBgColor)
             setPadding(16, 16, 16, 16)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = (24 * density).toInt() }
+            ).apply { bottomMargin = (8 * density).toInt() }
         }
         container.addView(exacerbList)
 
-        // Load medications
-        lifecycleScope.launch {
+        container.addView(Button(ctx).apply {
+            text = "+ Add Exacerbation Medication"
+            isAllCaps = false
+            isSingleLine = false
+            ellipsize = null
+            setBackgroundColor(primaryColor)
+            setTextColor(ContextCompat.getColor(ctx, android.R.color.white))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (24 * density).toInt() }
+            setOnClickListener {
+                AddMedicationDialog(defaultType = "exacerbation") { med ->
+                    lifecycleScope.launch { repo.insertMedication(med) }
+                }.show(parentFragmentManager, "AddExacerbationMed")
+            }
+        })
+
+        // Load medications (real-time, with delete buttons).
+        // Track these long-running flow collectors so showContentForTool can cancel
+        // them on tab switch (otherwise they leak references to detached LinearLayouts
+        // and accumulate every time the user opens Care Plan — eventual OOM).
+        contentJobs += lifecycleScope.launch {
             repo.getMedicationsByType("daily").collectLatest { list ->
                 if (!isAdded) return@collectLatest
                 dailyList.removeAllViews()
                 if (list.isEmpty()) {
-                    dailyList.addView(TextView(ctx).apply { 
+                    dailyList.addView(TextView(ctx).apply {
                         text = "No daily medications added yet."
                         setTextColor(secondaryTextColor)
                     })
                 } else {
-                    list.forEach { med ->
-                        dailyList.addView(TextView(ctx).apply {
-                            text = "${med.name} - ${med.dosage} (${med.frequency})"
-                            setPadding(0, 4, 0, 4)
-                        })
-                    }
+                    list.forEach { med -> renderMedRow(dailyList, med) }
                 }
             }
         }
-        lifecycleScope.launch {
+        contentJobs += lifecycleScope.launch {
             repo.getMedicationsByType("exacerbation").collectLatest { list ->
                 if (!isAdded) return@collectLatest
                 exacerbList.removeAllViews()
                 if (list.isEmpty()) {
-                    exacerbList.addView(TextView(ctx).apply { 
+                    exacerbList.addView(TextView(ctx).apply {
                         text = "No exacerbation medications added yet."
                         setTextColor(secondaryTextColor)
                     })
                 } else {
-                    list.forEach { med ->
-                        exacerbList.addView(TextView(ctx).apply {
-                            text = "${med.name} - ${med.dosage} (${med.frequency})"
-                            setPadding(0, 4, 0, 4)
-                        })
-                    }
+                    list.forEach { med -> renderMedRow(exacerbList, med) }
                 }
             }
         }
@@ -473,7 +576,7 @@ class ResourcesFragment : Fragment() {
                 "I'm not sleeping well",
                 "My appetite is not good"
             ),
-            "Continue daily medication and start exacerbation medications as prescribed",
+            "Use your clinician-provided plan. If symptoms worsen, contact your clinician.",
             ContextCompat.getColor(ctx, android.R.color.holo_orange_light),
             ContextCompat.getColor(ctx, android.R.color.holo_orange_dark)
         )
@@ -489,12 +592,12 @@ class ResourcesFragment : Fragment() {
                 "Chest pains",
                 "Coughing up blood"
             ),
-            "Call 911 or have someone take you to the emergency room",
+            "Seek urgent medical care immediately (use local emergency services).",
             ContextCompat.getColor(ctx, android.R.color.holo_red_light),
             ContextCompat.getColor(ctx, android.R.color.holo_red_dark)
         )
 
-        // Additional Instructions Section
+        // ============ ADDITIONAL INSTRUCTIONS LOG (each Save appends a new entry) ============
         container.addView(TextView(ctx).apply {
             text = "Additional Instructions from Your Doctor"
             textSize = 18f
@@ -503,36 +606,201 @@ class ResourcesFragment : Fragment() {
             setPadding(0, 16, 0, 8)
         })
 
-        val instructions = android.widget.EditText(ctx).apply {
-            hint = "Enter any additional instructions from your doctor here..."
-            minLines = 4
-            gravity = android.view.Gravity.TOP
-            setBackgroundColor(cardBgColor)
-            setPadding(16, 16, 16, 16)
-            setText(prefs.getString("action_plan_instructions", "") ?: "")
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = (16 * density).toInt() }
-        }
-        container.addView(instructions)
+        // Local data class + helpers, scoped to this function so a linter pass won't shuffle them.
+        data class InstructionEntry(val id: String, val savedAt: Long, val text: String)
 
-        // Save Button
-        container.addView(Button(ctx).apply {
-            text = "Save Plan"
-            setBackgroundColor(primaryColor)
-            setTextColor(ContextCompat.getColor(ctx, android.R.color.white))
-            setOnClickListener {
-                prefs.edit()
-                    .putString("doctor_name", doctorNameField.text.toString())
-                    .putString("doctor_phone", doctorPhoneField.text.toString())
-                    .putString("emergency_contact_name", emergencyNameField.text.toString())
-                    .putString("emergency_contact_phone", emergencyPhoneField.text.toString())
-                    .putString("action_plan_instructions", instructions.text.toString())
-                    .apply()
-                android.widget.Toast.makeText(ctx, "Action plan saved!", android.widget.Toast.LENGTH_SHORT).show()
+        fun loadInstructionsLog(): MutableList<InstructionEntry> {
+            val raw = prefs.getString("doctor_instructions_log", null)
+            val list = mutableListOf<InstructionEntry>()
+            if (raw != null) {
+                try {
+                    val arr = org.json.JSONArray(raw)
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        list.add(InstructionEntry(
+                            id = o.optString("id", java.util.UUID.randomUUID().toString()),
+                            savedAt = o.optLong("savedAt", 0L),
+                            text = o.optString("text", "")
+                        ))
+                    }
+                } catch (_: Exception) { /* fall through with empty list */ }
+            } else {
+                // Migrate legacy single-string instructions into the first log entry.
+                val legacy = prefs.getString("action_plan_instructions", "") ?: ""
+                if (legacy.isNotBlank()) {
+                    val migrated = InstructionEntry(
+                        id = java.util.UUID.randomUUID().toString(),
+                        savedAt = System.currentTimeMillis(),
+                        text = legacy
+                    )
+                    list.add(migrated)
+                    val arr = org.json.JSONArray()
+                    arr.put(org.json.JSONObject()
+                        .put("id", migrated.id)
+                        .put("savedAt", migrated.savedAt)
+                        .put("text", migrated.text))
+                    prefs.edit().putString("doctor_instructions_log", arr.toString()).apply()
+                }
             }
-        })
+            return list
+        }
+
+        fun saveInstructionsLog(list: List<InstructionEntry>) {
+            val arr = org.json.JSONArray()
+            list.forEach {
+                arr.put(org.json.JSONObject()
+                    .put("id", it.id)
+                    .put("savedAt", it.savedAt)
+                    .put("text", it.text))
+            }
+            prefs.edit().putString("doctor_instructions_log", arr.toString()).apply()
+        }
+
+        val instructionsLog = loadInstructionsLog()
+        val sortedLog = instructionsLog.sortedByDescending { it.savedAt }
+        val instructionsDateFormat = java.text.SimpleDateFormat("MMM d, yyyy h:mm a", java.util.Locale.getDefault())
+
+        if (isEditingInstructions) {
+            val instructionsField = android.widget.EditText(ctx).apply {
+                hint = "Enter new instructions from your doctor..."
+                minLines = 4
+                gravity = android.view.Gravity.TOP
+                setBackgroundColor(cardBgColor)
+                setPadding(16, 16, 16, 16)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = (16 * density).toInt() }
+            }
+            container.addView(instructionsField)
+
+            container.addView(Button(ctx).apply {
+                text = "Save"
+                isAllCaps = false
+                setBackgroundColor(primaryColor)
+                setTextColor(ContextCompat.getColor(ctx, android.R.color.white))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = (8 * density).toInt() }
+                setOnClickListener {
+                    val newText = instructionsField.text.toString().trim()
+                    if (newText.isBlank()) {
+                        android.widget.Toast.makeText(ctx, "Instructions cannot be empty", android.widget.Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    val updated = loadInstructionsLog()
+                    updated.add(InstructionEntry(
+                        id = java.util.UUID.randomUUID().toString(),
+                        savedAt = System.currentTimeMillis(),
+                        text = newText
+                    ))
+                    saveInstructionsLog(updated)
+                    android.widget.Toast.makeText(ctx, "Instructions saved", android.widget.Toast.LENGTH_SHORT).show()
+                    isEditingInstructions = false
+                    showContentForTool(1)
+                }
+            })
+
+            if (instructionsLog.isNotEmpty()) {
+                container.addView(Button(ctx).apply {
+                    text = "Cancel"
+                    isAllCaps = false
+                    setBackgroundColor(ContextCompat.getColor(ctx, R.color.textTertiary))
+                    setTextColor(ContextCompat.getColor(ctx, android.R.color.white))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = (16 * density).toInt() }
+                    setOnClickListener {
+                        isEditingInstructions = false
+                        showContentForTool(1)
+                    }
+                })
+            }
+        } else {
+            container.addView(Button(ctx).apply {
+                text = "+ Add New Instruction"
+                isAllCaps = false
+                isSingleLine = false
+                ellipsize = null
+                setBackgroundColor(primaryColor)
+                setTextColor(ContextCompat.getColor(ctx, android.R.color.white))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = (16 * density).toInt() }
+                setOnClickListener {
+                    isEditingInstructions = true
+                    showContentForTool(1)
+                }
+            })
+
+            if (sortedLog.isEmpty()) {
+                container.addView(TextView(ctx).apply {
+                    text = "No instructions saved yet."
+                    textSize = 14f
+                    setTextColor(secondaryTextColor)
+                    setPadding(0, 0, 0, 16)
+                })
+            } else {
+                sortedLog.forEach { entry ->
+                    val card = LinearLayout(ctx).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setBackgroundColor(cardBgColor)
+                        setPadding(20, 16, 20, 16)
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { bottomMargin = (12 * density).toInt() }
+                    }
+                    container.addView(card)
+
+                    val headerRow = LinearLayout(ctx).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        )
+                    }
+                    card.addView(headerRow)
+
+                    headerRow.addView(TextView(ctx).apply {
+                        text = "Saved: ${instructionsDateFormat.format(java.util.Date(entry.savedAt))}"
+                        textSize = 12f
+                        setTextColor(secondaryTextColor)
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    })
+                    headerRow.addView(TextView(ctx).apply {
+                        text = "Delete"
+                        textSize = 12f
+                        setTypeface(null, android.graphics.Typeface.BOLD)
+                        setTextColor(ContextCompat.getColor(ctx, android.R.color.holo_red_dark))
+                        setPadding(16, 0, 0, 0)
+                        setOnClickListener {
+                            androidx.appcompat.app.AlertDialog.Builder(ctx)
+                                .setTitle("Delete instruction?")
+                                .setMessage("This entry will be permanently removed.")
+                                .setPositiveButton("Delete") { _, _ ->
+                                    val updated = loadInstructionsLog()
+                                    updated.removeAll { it.id == entry.id }
+                                    saveInstructionsLog(updated)
+                                    showContentForTool(1)
+                                }
+                                .setNegativeButton("Cancel", null)
+                                .show()
+                        }
+                    })
+
+                    card.addView(TextView(ctx).apply {
+                        text = entry.text
+                        textSize = 16f
+                        setTextColor(primaryDarkColor)
+                        setPadding(0, 8, 0, 0)
+                    })
+                }
+            }
+        }
     }
 
     private fun buildPulmonaryContent() {
@@ -807,26 +1075,436 @@ class ResourcesFragment : Fragment() {
             setPadding(0, 0, 0, 32)
         })
 
-        // Start Exercise Journey Button
-        container.addView(Button(ctx).apply {
-            text = "Start Exercise Journal"
-            setBackgroundColor(primaryColor)
-            setTextColor(ContextCompat.getColor(ctx, android.R.color.white))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                bottomMargin = (24 * resources.displayMetrics.density).toInt()
+        // ============ EXERCISE JOURNAL ============
+        run {
+            val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(ctx)
+            val cardBgColor = ContextCompat.getColor(ctx, R.color.cardBackgroundBlue)
+            val density = resources.displayMetrics.density
+
+            data class ExerciseEntry(
+                val id: String,
+                val savedAt: Long,
+                val dayMillis: Long,
+                val timeText: String,
+                val warmUp: String,
+                val exercise: String,
+                val sets: Int,
+                val reps: Int,
+                val weight: Double,
+                val weightUnit: String,
+                val activity: String
+            )
+
+            fun loadJournal(): MutableList<ExerciseEntry> {
+                val raw = prefs.getString("exercise_journal_log", null) ?: return mutableListOf()
+                val list = mutableListOf<ExerciseEntry>()
+                try {
+                    val arr = org.json.JSONArray(raw)
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        list.add(ExerciseEntry(
+                            id = o.optString("id", java.util.UUID.randomUUID().toString()),
+                            savedAt = o.optLong("savedAt", 0L),
+                            dayMillis = o.optLong("dayMillis", 0L),
+                            timeText = o.optString("timeText", ""),
+                            warmUp = o.optString("warmUp", ""),
+                            exercise = o.optString("exercise", ""),
+                            sets = o.optInt("sets", 0),
+                            reps = o.optInt("reps", 0),
+                            weight = o.optDouble("weight", 0.0),
+                            weightUnit = o.optString("weightUnit", "lbs"),
+                            activity = o.optString("activity", "")
+                        ))
+                    }
+                } catch (_: Exception) { /* fall through */ }
+                return list
             }
-            setOnClickListener {
-                (activity as? com.copdhealthtracker.MainActivity)?.switchToTracking()
+
+            fun saveJournal(list: List<ExerciseEntry>) {
+                val arr = org.json.JSONArray()
+                list.forEach {
+                    arr.put(org.json.JSONObject()
+                        .put("id", it.id)
+                        .put("savedAt", it.savedAt)
+                        .put("dayMillis", it.dayMillis)
+                        .put("timeText", it.timeText)
+                        .put("warmUp", it.warmUp)
+                        .put("exercise", it.exercise)
+                        .put("sets", it.sets)
+                        .put("reps", it.reps)
+                        .put("weight", it.weight)
+                        .put("weightUnit", it.weightUnit)
+                        .put("activity", it.activity))
+                }
+                prefs.edit().putString("exercise_journal_log", arr.toString()).apply()
             }
-        })
+
+            // Sub-container so we can re-render only the journal in place
+            // (avoids tearing down the whole Pulmonary Rehab tab and resetting the ScrollView)
+            val journalContainer = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+            container.addView(journalContainer)
+
+            val journalDateFormat = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault())
+
+            lateinit var renderJournal: () -> Unit
+            renderJournal = {
+                journalContainer.removeAllViews()
+
+                journalContainer.addView(TextView(ctx).apply {
+                    text = "Exercise Journal"
+                    textSize = 22f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setTextColor(primaryDarkColor)
+                    setPadding(0, 32, 0, 8)
+                })
+                journalContainer.addView(TextView(ctx).apply {
+                    text = "Daily log of warm-ups, exercises, sets, reps, weights, and activity. All fields are optional — fill in only what applies."
+                    textSize = 14f
+                    setTextColor(secondaryTextColor)
+                    setPadding(0, 0, 0, 16)
+                })
+
+                val journal = loadJournal()
+                val sortedJournal = journal.sortedByDescending { it.savedAt }
+                val sevenDaysAgoMillis = java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                    add(java.util.Calendar.DAY_OF_YEAR, -7)
+                }.timeInMillis
+                val recentJournal = sortedJournal.filter { it.dayMillis >= sevenDaysAgoMillis }
+
+                if (isEditingExerciseJournal) {
+                // Form mode — closure-captured form state
+                var selectedDayMillis = System.currentTimeMillis()
+                val cal = java.util.Calendar.getInstance()
+                var selectedHour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+                var selectedMinute = cal.get(java.util.Calendar.MINUTE)
+
+                fun formatTime(): String {
+                    val displayHour = when {
+                        selectedHour == 0 -> 12
+                        selectedHour > 12 -> selectedHour - 12
+                        else -> selectedHour
+                    }
+                    val ampm = if (selectedHour < 12) "AM" else "PM"
+                    val mm = String.format("%02d", selectedMinute)
+                    return "$displayHour:$mm $ampm"
+                }
+
+                journalContainer.addView(TextView(ctx).apply {
+                    text = "Day"
+                    textSize = 14f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setPadding(0, 8, 0, 4)
+                })
+                val dayButton = Button(ctx).apply {
+                    isAllCaps = false
+                    text = journalDateFormat.format(java.util.Date(selectedDayMillis))
+                    setBackgroundColor(cardBgColor)
+                    setTextColor(primaryDarkColor)
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = (12 * density).toInt() }
+                }
+                dayButton.setOnClickListener {
+                    val c = java.util.Calendar.getInstance().apply { timeInMillis = selectedDayMillis }
+                    android.app.DatePickerDialog(ctx, { _, year, month, day ->
+                        val newCal = java.util.Calendar.getInstance()
+                        newCal.set(year, month, day, 0, 0, 0)
+                        newCal.set(java.util.Calendar.MILLISECOND, 0)
+                        selectedDayMillis = newCal.timeInMillis
+                        dayButton.text = journalDateFormat.format(java.util.Date(selectedDayMillis))
+                    },
+                    c.get(java.util.Calendar.YEAR),
+                    c.get(java.util.Calendar.MONTH),
+                    c.get(java.util.Calendar.DAY_OF_MONTH)).show()
+                }
+                journalContainer.addView(dayButton)
+
+                journalContainer.addView(TextView(ctx).apply {
+                    text = "Time"
+                    textSize = 14f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setPadding(0, 8, 0, 4)
+                })
+                val timeButton = Button(ctx).apply {
+                    isAllCaps = false
+                    text = formatTime()
+                    setBackgroundColor(cardBgColor)
+                    setTextColor(primaryDarkColor)
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = (12 * density).toInt() }
+                }
+                timeButton.setOnClickListener {
+                    android.app.TimePickerDialog(ctx, { _, h, m ->
+                        selectedHour = h
+                        selectedMinute = m
+                        timeButton.text = formatTime()
+                    }, selectedHour, selectedMinute, false).show()
+                }
+                journalContainer.addView(timeButton)
+
+                fun addJournalField(label: String, hintText: String, inputType: Int = android.text.InputType.TYPE_CLASS_TEXT): android.widget.EditText {
+                    journalContainer.addView(TextView(ctx).apply {
+                        text = label
+                        textSize = 14f
+                        setTypeface(null, android.graphics.Typeface.BOLD)
+                        setPadding(0, 8, 0, 4)
+                    })
+                    val edit = android.widget.EditText(ctx).apply {
+                        hint = hintText
+                        this.inputType = inputType
+                        setBackgroundColor(cardBgColor)
+                        setPadding(16, 16, 16, 16)
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { bottomMargin = (12 * density).toInt() }
+                    }
+                    journalContainer.addView(edit)
+                    return edit
+                }
+
+                val warmUpField = addJournalField("Warm Up", "e.g., 5 min walk, stretching")
+                val exerciseField = addJournalField("Exercise", "e.g., Bench press, Squats")
+                val setsField = addJournalField("Sets", "e.g., 3", android.text.InputType.TYPE_CLASS_NUMBER)
+                val repsField = addJournalField("Reps", "e.g., 10", android.text.InputType.TYPE_CLASS_NUMBER)
+
+                journalContainer.addView(TextView(ctx).apply {
+                    text = "Weight"
+                    textSize = 14f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setPadding(0, 8, 0, 4)
+                })
+                val weightRow = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = (12 * density).toInt() }
+                }
+                journalContainer.addView(weightRow)
+                val weightField = android.widget.EditText(ctx).apply {
+                    hint = "e.g., 25"
+                    inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                    setBackgroundColor(cardBgColor)
+                    setPadding(16, 16, 16, 16)
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        rightMargin = (8 * density).toInt()
+                    }
+                }
+                weightRow.addView(weightField)
+                val weightUnitSpinner = android.widget.Spinner(ctx).apply {
+                    adapter = android.widget.ArrayAdapter(ctx, android.R.layout.simple_spinner_item, arrayOf("lbs", "kg")).apply {
+                        setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                    }
+                }
+                weightRow.addView(weightUnitSpinner)
+
+                val activityField = addJournalField("Activity", "e.g., Strength training, Cardio")
+
+                journalContainer.addView(Button(ctx).apply {
+                    text = "Save Entry"
+                    isAllCaps = false
+                    setBackgroundColor(primaryColor)
+                    setTextColor(ContextCompat.getColor(ctx, android.R.color.white))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = (8 * density).toInt() }
+                    setOnClickListener {
+                        val updated = loadJournal()
+                        updated.add(ExerciseEntry(
+                            id = java.util.UUID.randomUUID().toString(),
+                            savedAt = System.currentTimeMillis(),
+                            dayMillis = selectedDayMillis,
+                            timeText = formatTime(),
+                            warmUp = warmUpField.text.toString().trim(),
+                            exercise = exerciseField.text.toString().trim(),
+                            sets = setsField.text.toString().toIntOrNull() ?: 0,
+                            reps = repsField.text.toString().toIntOrNull() ?: 0,
+                            weight = weightField.text.toString().toDoubleOrNull() ?: 0.0,
+                            weightUnit = if (weightUnitSpinner.selectedItemPosition == 0) "lbs" else "kg",
+                            activity = activityField.text.toString().trim()
+                        ))
+                        saveJournal(updated)
+                        android.widget.Toast.makeText(ctx, "Entry saved", android.widget.Toast.LENGTH_SHORT).show()
+                        isEditingExerciseJournal = false
+                        renderJournal()
+                    }
+                })
+
+                journalContainer.addView(Button(ctx).apply {
+                    text = "Cancel"
+                    isAllCaps = false
+                    setBackgroundColor(ContextCompat.getColor(ctx, R.color.textTertiary))
+                    setTextColor(ContextCompat.getColor(ctx, android.R.color.white))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = (24 * density).toInt() }
+                    setOnClickListener {
+                        isEditingExerciseJournal = false
+                        renderJournal()
+                    }
+                })
+            } else {
+                journalContainer.addView(Button(ctx).apply {
+                    text = "+ Start New Entry"
+                    isAllCaps = false
+                    isSingleLine = false
+                    ellipsize = null
+                    setBackgroundColor(primaryColor)
+                    setTextColor(ContextCompat.getColor(ctx, android.R.color.white))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = (16 * density).toInt() }
+                    setOnClickListener {
+                        isEditingExerciseJournal = true
+                        renderJournal()
+                    }
+                })
+
+                journalContainer.addView(TextView(ctx).apply {
+                    text = "Showing entries from the last 7 days. View all in Tracking → Month."
+                    textSize = 12f
+                    setTextColor(secondaryTextColor)
+                    setPadding(0, 0, 0, 12)
+                })
+
+                if (recentJournal.isEmpty()) {
+                    val emptyText = if (sortedJournal.isEmpty()) {
+                        "No journal entries yet."
+                    } else {
+                        "No journal entries in the last 7 days."
+                    }
+                    journalContainer.addView(TextView(ctx).apply {
+                        text = emptyText
+                        textSize = 14f
+                        setTextColor(secondaryTextColor)
+                        setPadding(0, 0, 0, 16)
+                    })
+                } else {
+                    recentJournal.forEach { entry ->
+                        val card = LinearLayout(ctx).apply {
+                            orientation = LinearLayout.VERTICAL
+                            setBackgroundColor(cardBgColor)
+                            setPadding(20, 16, 20, 16)
+                            layoutParams = LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT
+                            ).apply { bottomMargin = (12 * density).toInt() }
+                        }
+                        journalContainer.addView(card)
+
+                        val headerRow = LinearLayout(ctx).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            layoutParams = LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT
+                            )
+                        }
+                        card.addView(headerRow)
+                        headerRow.addView(TextView(ctx).apply {
+                            text = "${journalDateFormat.format(java.util.Date(entry.dayMillis))} • ${entry.timeText}"
+                            textSize = 12f
+                            setTextColor(secondaryTextColor)
+                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                        })
+                        headerRow.addView(TextView(ctx).apply {
+                            text = "Delete"
+                            textSize = 12f
+                            setTypeface(null, android.graphics.Typeface.BOLD)
+                            setTextColor(ContextCompat.getColor(ctx, android.R.color.holo_red_dark))
+                            setPadding(16, 0, 0, 0)
+                            setOnClickListener {
+                                androidx.appcompat.app.AlertDialog.Builder(ctx)
+                                    .setTitle("Delete entry?")
+                                    .setMessage("This journal entry will be permanently removed.")
+                                    .setPositiveButton("Delete") { _, _ ->
+                                        val updated = loadJournal()
+                                        updated.removeAll { it.id == entry.id }
+                                        saveJournal(updated)
+                                        renderJournal()
+                                    }
+                                    .setNegativeButton("Cancel", null)
+                                    .show()
+                            }
+                        })
+
+                        if (entry.exercise.isNotBlank()) {
+                            card.addView(TextView(ctx).apply {
+                                text = entry.exercise
+                                textSize = 18f
+                                setTypeface(null, android.graphics.Typeface.BOLD)
+                                setTextColor(primaryDarkColor)
+                                setPadding(0, 8, 0, 4)
+                            })
+                        }
+
+                        val statsParts = mutableListOf<String>()
+                        if (entry.sets > 0) statsParts.add("${entry.sets} sets")
+                        if (entry.reps > 0) statsParts.add("${entry.reps} reps")
+                        if (entry.weight > 0) {
+                            val weightStr = if (entry.weight % 1.0 == 0.0) entry.weight.toInt().toString() else entry.weight.toString()
+                            statsParts.add("$weightStr ${entry.weightUnit}")
+                        }
+                        if (statsParts.isNotEmpty()) {
+                            card.addView(TextView(ctx).apply {
+                                text = statsParts.joinToString(" • ")
+                                textSize = 14f
+                                setTextColor(primaryDarkColor)
+                                setPadding(0, 0, 0, 4)
+                            })
+                        }
+                        if (entry.activity.isNotBlank()) {
+                            card.addView(TextView(ctx).apply {
+                                text = "Activity: ${entry.activity}"
+                                textSize = 13f
+                                setTextColor(secondaryTextColor)
+                                setPadding(0, 0, 0, 4)
+                            })
+                        }
+                        if (entry.warmUp.isNotBlank()) {
+                            card.addView(TextView(ctx).apply {
+                                text = "Warm Up: ${entry.warmUp}"
+                                textSize = 13f
+                                setTextColor(secondaryTextColor)
+                                setPadding(0, 0, 0, 4)
+                            })
+                        }
+                        if (entry.exercise.isBlank() && statsParts.isEmpty() && entry.activity.isBlank() && entry.warmUp.isBlank()) {
+                            card.addView(TextView(ctx).apply {
+                                text = "(no details recorded)"
+                                textSize = 13f
+                                setTextColor(secondaryTextColor)
+                                setPadding(0, 8, 0, 4)
+                            })
+                        }
+                    }
+                }
+            }
+            }
+
+            renderJournal()
+        }
 
         // Add the pulmonary rehab exercises image at the end - full width
         // Use negative margins to counteract the container's 20dp padding
         val containerPadding = (20 * resources.displayMetrics.density).toInt()
-        
+
         val imageView = android.widget.ImageView(ctx).apply {
             setImageResource(R.drawable.pulmonary_rehab_exercises)
             adjustViewBounds = true
@@ -942,13 +1620,13 @@ class ResourcesFragment : Fragment() {
         // All 10 medication types with icons
         data class MedType(val title: String, val id: String, val iconRes: Int)
         val medicationTypes = listOf(
-            MedType("Bronchodilators", "bronchodilators", R.drawable.ic_med_bronchodilator),
+            MedType("Bronchodilator", "bronchodilators", R.drawable.ic_med_bronchodilator),
             MedType("Inhaled Corticosteroids", "ics", R.drawable.ic_med_ics),
             MedType("Combination Inhalers", "combination", R.drawable.ic_med_combination),
             MedType("Phosphodiesterase-4 Inhibitors", "pde4", R.drawable.ic_med_pde4),
             MedType("Antibiotics", "antibiotics", R.drawable.ic_med_antibiotics),
             MedType("Systemic Corticosteroids", "systemic", R.drawable.ic_med_systemic),
-            MedType("Methylxanthines", "methylxanthines", R.drawable.ic_med_methylxanthines),
+            MedType("Methylxanthine", "methylxanthines", R.drawable.ic_med_methylxanthines),
             MedType("Mucolytics/Expectorants", "mucolytics", R.drawable.ic_med_mucolytics),
             MedType("Biologics Medications for COPD", "biologics", R.drawable.ic_med_biologics),
             MedType("Nebulizer Medications", "nebulizer", R.drawable.ic_med_nebulizer)
@@ -1104,6 +1782,184 @@ class ResourcesFragment : Fragment() {
                 try { startActivity(intent) } catch (_: Exception) { }
             }
         })
+
+        // ===== Respiratory Support and Airway Clearance Devices =====
+        // Visual divider
+        container.addView(View(ctx).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (1 * density).toInt()
+            ).apply {
+                topMargin = (8 * density).toInt()
+                bottomMargin = (16 * density).toInt()
+            }
+            setBackgroundColor(ContextCompat.getColor(ctx, R.color.borderGray))
+        })
+
+        // Section header
+        container.addView(TextView(ctx).apply {
+            text = "Respiratory Support and Airway Clearance Devices"
+            textSize = 20f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(primaryDarkColor)
+            setPadding(0, (8 * density).toInt(), 0, (8 * density).toInt())
+        })
+
+        // Section description
+        container.addView(TextView(ctx).apply {
+            text = "Common devices used to support breathing, deliver oxygen, and clear mucus from the airways. Talk to your healthcare provider about which devices may be appropriate for your care."
+            textSize = 14f
+            setTextColor(secondaryTextColor)
+            setBackgroundColor(cardBgColor)
+            setPadding(24, 16, 24, 16)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (16 * density).toInt() }
+        })
+
+        // Helper: render one device card (name + classification + purpose)
+        fun addDeviceCard(parent: LinearLayout, name: String, classification: String, purpose: String) {
+            val card = com.google.android.material.card.MaterialCardView(ctx).apply {
+                radius = 12f * density
+                cardElevation = 1f * density
+                setCardBackgroundColor(ContextCompat.getColor(ctx, R.color.backgroundWhite))
+                strokeWidth = (1 * density).toInt()
+                strokeColor = ContextCompat.getColor(ctx, R.color.borderGray)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = (8 * density).toInt() }
+            }
+            val content = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(
+                    (16 * density).toInt(),
+                    (12 * density).toInt(),
+                    (16 * density).toInt(),
+                    (12 * density).toInt()
+                )
+            }
+            content.addView(TextView(ctx).apply {
+                text = name
+                textSize = 15f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(primaryDarkColor)
+                setPadding(0, 0, 0, (4 * density).toInt())
+            })
+            content.addView(TextView(ctx).apply {
+                text = "Classification: $classification"
+                textSize = 13f
+                setTextColor(secondaryTextColor)
+            })
+            content.addView(TextView(ctx).apply {
+                text = "Purpose: $purpose"
+                textSize = 13f
+                setTextColor(secondaryTextColor)
+                setPadding(0, (2 * density).toInt(), 0, 0)
+            })
+            card.addView(content)
+            parent.addView(card)
+        }
+
+        // Helper: render one category block (heading + description + devices)
+        fun addCategoryBlock(
+            number: Int,
+            title: String,
+            description: String,
+            build: (LinearLayout) -> Unit
+        ) {
+            container.addView(TextView(ctx).apply {
+                text = "$number. $title"
+                textSize = 17f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(primaryDarkColor)
+                setPadding(0, (12 * density).toInt(), 0, (4 * density).toInt())
+            })
+            container.addView(TextView(ctx).apply {
+                text = description
+                textSize = 13f
+                setTextColor(secondaryTextColor)
+                setPadding(0, 0, 0, (8 * density).toInt())
+            })
+            val devicesHolder = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+            build(devicesHolder)
+            container.addView(devicesHolder)
+        }
+
+        // 1. Airway Clearance Devices
+        addCategoryBlock(
+            number = 1,
+            title = "Airway Clearance Devices",
+            description = "Devices used to loosen, mobilize, and help remove mucus from the lungs."
+        ) { holder ->
+            addDeviceCard(
+                holder,
+                name = "Aerobika",
+                classification = "Oscillating Positive Expiratory Pressure (OPEP) device",
+                purpose = "Uses pressure and vibrations when you breathe out to loosen and clear sticky mucus from the lungs"
+            )
+            addDeviceCard(
+                holder,
+                name = "Flutter valve",
+                classification = "Oscillating Positive Expiratory Pressure (OPEP) device",
+                purpose = "When you exhale into the flutter valve, your breath lifts and drops a steel ball inside, creating vibrations that shake the mucus loose from one's airways"
+            )
+            addDeviceCard(
+                holder,
+                name = "High-frequency chest wall oscillation vest",
+                classification = "High-frequency chest wall oscillation (HFCWO) device",
+                purpose = "High-Frequency Chest Wall Oscillation (HFCWO) vest therapy uses rapid air pulses to squeeze and vibrate your chest, which thins and shakes stubborn mucus loose from your airway walls so you can cough it out."
+            )
+        }
+
+        // 2. Oxygen Therapy Devices
+        addCategoryBlock(
+            number = 2,
+            title = "Oxygen Therapy Devices",
+            description = "Devices used to improve oxygen levels in patients with hypoxemia."
+        ) { holder ->
+            addDeviceCard(
+                holder,
+                name = "Oxygen concentrator",
+                classification = "Oxygen delivery device",
+                purpose = "Provides supplemental oxygen to help support a patient's oxygen levels"
+            )
+        }
+
+        // 3. BiPAP Devices
+        addCategoryBlock(
+            number = 3,
+            title = "BiPAP Devices",
+            description = "Devices used to provide pressure-supported breathing assistance."
+        ) { holder ->
+            addDeviceCard(
+                holder,
+                name = "BiPAP",
+                classification = "Bilevel Positive Airway Pressure device",
+                purpose = "Delivers two levels of air pressure, with higher pressure during inhalation called IPAP and lower pressure during exhalation called EPAP, to keep the airways open, improve ventilation, and reduce the work of breathing for the lungs."
+            )
+        }
+
+        // 4. Noninvasive Ventilation (NIV)
+        addCategoryBlock(
+            number = 4,
+            title = "Noninvasive Ventilation (NIV)",
+            description = "Devices used to deliver breathing support through a mask rather than an invasive airway."
+        ) { holder ->
+            addDeviceCard(
+                holder,
+                name = "NIV",
+                classification = "Noninvasive positive pressure ventilation (NIPPV) device",
+                purpose = "Helps support breathing and improves gas exchange without intubation. Used to prevent unintended breath stacking."
+            )
+        }
 
         // Important note at bottom
         container.addView(TextView(ctx).apply {
@@ -1675,6 +2531,12 @@ class ResourcesFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        contentJobs.forEach { it.cancel() }
+        contentJobs.clear()
         _binding = null
+    }
+
+    companion object {
+        private const val KEY_SELECTED_TOOL_INDEX = "selectedToolIndex"
     }
 }

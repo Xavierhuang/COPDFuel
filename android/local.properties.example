@@ -3,3 +3,9 @@
 
 GOOGLE_PLACES_API_KEY=
 USDA_FDC_API_KEY=
+
+# Release signing (required for uploading to Google Play). Create keystore first - see docs/SIGNING_RELEASE.md
+# RELEASE_STORE_FILE=/absolute/path/to/your/copdfuel-upload.keystore
+# RELEASE_STORE_PASSWORD=your_store_password
+# RELEASE_KEY_ALIAS=copdfuel
+# RELEASE_KEY_PASSWORD=your_key_password

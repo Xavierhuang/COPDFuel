@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:padding="16dp">
@@ -55,26 +56,64 @@
 
         </RadioGroup>
 
-        <!-- Food Category Filter (for local database) -->
+        <!-- FILTER SECTION -->
         <LinearLayout
-            android:id="@+id/category_filter_container"
+            android:id="@+id/filter_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:layout_marginBottom="8dp">
+            android:visibility="visible">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Filter by Category (optional)"
-                android:textSize="12sp"
-                android:textColor="#6b7280"
-                android:layout_marginBottom="4dp" />
+                android:text="Filter by"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#374151"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp" />
 
+            <!-- Filter Type Radio Buttons (simpler than chips) -->
+            <RadioGroup
+                android:id="@+id/filter_type_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <RadioButton
+                    android:id="@+id/radio_category_filter"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Category"
+                    android:checked="true" />
+
+                <RadioButton
+                    android:id="@+id/radio_food_group_filter"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Food Group" />
+
+            </RadioGroup>
+
+            <!-- Category Filter Spinner -->
             <Spinner
                 android:id="@+id/category_filter_spinner"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:visibility="visible" />
+
+            <!-- Food Group Filter Spinner -->
+            <Spinner
+                android:id="@+id/food_group_filter_spinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:visibility="gone" />
 
         </LinearLayout>
 
@@ -206,8 +245,7 @@
                 <Spinner
                     android:id="@+id/serving_size_spinner"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@android:drawable/btn_dropdown" />
+                    android:layout_height="wrap_content" />
 
             </LinearLayout>
 
@@ -219,8 +257,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
             app:cardCornerRadius="8dp"
-            app:cardElevation="2dp"
-            xmlns:app="http://schemas.android.com/apk/res-auto">
+            app:cardElevation="2dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -242,7 +279,6 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
 
-                    <!-- Calories -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -268,7 +304,6 @@
 
                     </LinearLayout>
 
-                    <!-- Protein -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -294,7 +329,6 @@
 
                     </LinearLayout>
 
-                    <!-- Carbs -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -320,7 +354,6 @@
 
                     </LinearLayout>
 
-                    <!-- Fat -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -352,7 +385,7 @@
 
         </androidx.cardview.widget.CardView>
 
-        <!-- Manual Entry Section (collapsed by default) -->
+        <!-- Manual Entry Section -->
         <LinearLayout
             android:id="@+id/manual_entry_section"
             android:layout_width="match_parent"
@@ -481,7 +514,6 @@
 
         </LinearLayout>
 
-        <!-- Toggle Manual Entry Button -->
         <Button
             android:id="@+id/toggle_manual_button"
             android:layout_width="wrap_content"
@@ -493,7 +525,6 @@
             android:layout_gravity="center"
             android:layout_marginTop="8dp" />
 
-        <!-- Save as favorite (for quick add later) -->
         <Button
             android:id="@+id/save_as_favorite_button"
             android:layout_width="wrap_content"

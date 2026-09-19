@@ -11,6 +11,7 @@ import com.copdhealthtracker.data.model.Medication
 import com.copdhealthtracker.databinding.DialogAddMedicationBinding
 
 class AddMedicationDialog(
+    private val defaultType: String? = null,
     private val onSave: (Medication) -> Unit
 ) : DialogFragment() {
 
@@ -24,6 +25,11 @@ class AddMedicationDialog(
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, types)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         binding.medicationTypeSpinner.adapter = adapter
+        when (defaultType) {
+            "daily" -> binding.medicationTypeSpinner.setSelection(0)
+            "exacerbation" -> binding.medicationTypeSpinner.setSelection(1)
+            else -> {}
+        }
 
         return AlertDialog.Builder(requireContext())
             .setTitle("Add Medication")
