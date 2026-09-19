@@ -5,12 +5,14 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import android.os.Bundle
+import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
@@ -23,7 +25,10 @@ import com.copdhealthtracker.data.model.FavoriteMeal
 import com.copdhealthtracker.data.model.FoodEntry
 import com.copdhealthtracker.data.model.WaterEntry
 import com.copdhealthtracker.databinding.FragmentTrackingBinding
+import com.copdhealthtracker.ui.bottomsheets.AddFoodBottomSheet
 import com.copdhealthtracker.ui.dialogs.*
+import com.copdhealthtracker.ui.scan.LabelReviewActivity
+import com.copdhealthtracker.ui.scan.ScanLabelActivity
 import com.copdhealthtracker.ui.viewmodel.TrackingViewModel
 import com.copdhealthtracker.ui.viewmodel.TrackingViewModelFactory
 import com.copdhealthtracker.health.HealthConnectImportResult
@@ -69,8 +74,29 @@ class TrackingFragment : Fragment() {
         }
     }
 
+    private val scanLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val food = result.data?.getParcelableExtra<FoodEntry>(LabelReviewActivity.EXTRA_FOOD_ENTRY)
+            food?.let { viewModel.insertFood(it) }
+        }
+    }
+
+    private val photoLibraryLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val uri = result.data?.data ?: return@registerForActivityResult
+            val intent = Intent(requireContext(), LabelReviewActivity::class.java).apply {
+                putExtra(LabelReviewActivity.EXTRA_NUTRITION_LABEL_URI, uri.toString())
+            }
+            scanLauncher.launch(intent)
+        }
+    }
+
     private enum class ViewType { DAY, WEEK, MONTH }
-    
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -1889,6 +1915,17 @@ class TrackingFragment : Fragment() {
     }
     
     private fun showFoodDialog() {
+        AddFoodBottomSheet { action ->
+            when (action) {
+                AddFoodBottomSheet.Action.ADD_FOOD -> showAddFoodDialog()
+                AddFoodBottomSheet.Action.SCAN_LABEL -> launchScanLabel()
+                AddFoodBottomSheet.Action.SCAN_QR_CODE -> launchScanQrCode()
+                AddFoodBottomSheet.Action.PHOTO_LIBRARY -> launchPhotoLibrary()
+            }
+        }.show(parentFragmentManager, "AddFoodBottomSheet")
+    }
+
+    private fun showAddFoodDialog() {
         val dialog = AddFoodDialog(
             onSave = { viewModel.insertFood(it) },
             dateForEntry = selectedDateMillis,
@@ -1897,6 +1934,25 @@ class TrackingFragment : Fragment() {
             insertUserAddedFood = { viewModel.insertUserAddedFood(it) }
         )
         dialog.show(parentFragmentManager, "AddFoodDialog")
+    }
+
+    private fun launchScanLabel() {
+        val intent = Intent(requireContext(), ScanLabelActivity::class.java).apply {
+            putExtra(ScanLabelActivity.EXTRA_SCAN_MODE, ScanLabelActivity.SCAN_MODE_LABEL)
+        }
+        scanLauncher.launch(intent)
+    }
+
+    private fun launchScanQrCode() {
+        val intent = Intent(requireContext(), ScanLabelActivity::class.java).apply {
+            putExtra(ScanLabelActivity.EXTRA_SCAN_MODE, ScanLabelActivity.SCAN_MODE_QR)
+        }
+        scanLauncher.launch(intent)
+    }
+
+    private fun launchPhotoLibrary() {
+        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+        photoLibraryLauncher.launch(intent)
     }
 
     private fun showFavoritesDialog() {
