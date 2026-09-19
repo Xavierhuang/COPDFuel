@@ -4,8 +4,44 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- Syringe icon for biologics - blue-gray -->
-    <path
-        android:fillColor="#5c6bc0"
-        android:pathData="M11,5.5v-2c0,-0.55 0.45,-1 1,-1s1,0.45 1,1v2h2v-2c0,-0.55 0.45,-1 1,-1s1,0.45 1,1v2c0.55,0 1,0.45 1,1v3l-3,3v6c0,0.55 -0.45,1 -1,1h-4c-0.55,0 -1,-0.45 -1,-1v-6l-3,-3v-3c0,-0.55 0.45,-1 1,-1v-2c0,-0.55 0.45,-1 1,-1s1,0.45 1,1v2h2zM10,17.5v-5.17l3,-3V7.5h-2v2h-2v-2h-2v1.83l3,3v5.17h2z"/>
+    <!-- Prefilled syringe icon for biologics - indigo, drawn upright then tilted 45 degrees -->
+    <group
+        android:pivotX="12"
+        android:pivotY="12"
+        android:rotation="45">
+        <!-- Thumb rest -->
+        <path
+            android:fillColor="#5c6bc0"
+            android:pathData="M8.5,0.5h7a0.75,0.75 0 0 1 0,1.5h-7a0.75,0.75 0 0 1 0,-1.5z"/>
+        <!-- Plunger rod -->
+        <path
+            android:fillColor="#5c6bc0"
+            android:pathData="M11.25,2h1.5v4.5h-1.5z"/>
+        <!-- Finger flange -->
+        <path
+            android:fillColor="#5c6bc0"
+            android:pathData="M7.5,6.5h9a0.75,0.75 0 0 1 0,1.5h-9a0.75,0.75 0 0 1 0,-1.5z"/>
+        <!-- Medicine inside the barrel (what makes it "prefilled") -->
+        <path
+            android:fillColor="#9fa8da"
+            android:pathData="M9.75,11.5h4.5v6.25h-4.5z"/>
+        <!-- Plunger stopper -->
+        <path
+            android:fillColor="#5c6bc0"
+            android:pathData="M9.75,9.75h4.5v1.75h-4.5z"/>
+        <!-- Barrel outline -->
+        <path
+            android:strokeColor="#5c6bc0"
+            android:strokeWidth="1.5"
+            android:strokeLineJoin="round"
+            android:pathData="M9,8h6v10.5h-6z"/>
+        <!-- Needle hub -->
+        <path
+            android:fillColor="#5c6bc0"
+            android:pathData="M10.75,18.5h2.5l-0.5,1.75h-1.5z"/>
+        <!-- Needle -->
+        <path
+            android:fillColor="#5c6bc0"
+            android:pathData="M11.6,20.25h0.8v3.25l-0.4,0.5l-0.4,-0.5z"/>
+    </group>
 </vector>

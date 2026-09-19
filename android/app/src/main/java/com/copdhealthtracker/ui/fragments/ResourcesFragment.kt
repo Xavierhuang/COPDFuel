@@ -1635,7 +1635,7 @@ class ResourcesFragment : Fragment() {
             MedType("Systemic Corticosteroids", "systemic", R.drawable.ic_med_systemic),
             MedType("Methylxanthine", "methylxanthines", R.drawable.ic_med_methylxanthines),
             MedType("Mucolytics/Expectorants", "mucolytics", R.drawable.ic_med_mucolytics),
-            MedType("Biologics Medications for COPD", "biologics", R.drawable.ic_med_biologics),
+            MedType("Biologics", "biologics", R.drawable.ic_med_biologics),
             MedType("Nebulizer Medications", "nebulizer", R.drawable.ic_med_nebulizer)
         )
 
@@ -1704,11 +1704,41 @@ class ResourcesFragment : Fragment() {
                 
                 typeCard.setOnClickListener {
                     val info = MedicationTypes.forId(medType.id) ?: return@setOnClickListener
-                    androidx.appcompat.app.AlertDialog.Builder(ctx)
+                    // Bold section headings so the long guide is easy to scan.
+                    val guide = android.text.SpannableStringBuilder()
+                    info.sections().forEachIndexed { index, (heading, body) ->
+                        if (index > 0) guide.append("\n\n")
+                        val start = guide.length
+                        guide.append(heading)
+                        guide.setSpan(
+                            android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                            start, guide.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        guide.append("\n").append(body)
+                    }
+                    val dialog = androidx.appcompat.app.AlertDialog.Builder(ctx)
                         .setTitle(info.title)
-                        .setMessage(info.message())
+                        .setMessage(guide)
                         .setPositiveButton("Close", null)
                         .show()
+
+                    // Hanging indent: when a bullet line wraps, continue under its text, not under
+                    // the bullet. Measured with the dialog's own paint so it holds at any text size.
+                    dialog.findViewById<TextView>(android.R.id.message)?.let { messageView ->
+                        val indent = messageView.paint.measureText(MedicationTypes.BULLET).toInt()
+                        var lineStart = 0
+                        for (line in guide.toString().split("\n")) {
+                            if (line.startsWith(MedicationTypes.BULLET)) {
+                                guide.setSpan(
+                                    android.text.style.LeadingMarginSpan.Standard(0, indent),
+                                    lineStart, lineStart + line.length,
+                                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                                )
+                            }
+                            lineStart += line.length + 1
+                        }
+                        messageView.text = guide
+                    }
                 }
                 
                 typesRow.addView(typeCard)

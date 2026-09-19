@@ -8,40 +8,70 @@ import org.junit.Test
 
 class MedicationTypesTest {
 
-    // The ids of the ten icons in Resp. Care > Medication Types.
+    // The ids of the ten icons in the Resp. Care tab.
     private val iconIds = listOf(
         "bronchodilators", "ics", "combination", "pde4", "antibiotics",
         "systemic", "methylxanthines", "mucolytics", "biologics", "nebulizer"
     )
 
     @Test
-    fun `every medication type icon has an explanation`() {
-        iconIds.forEach { id -> assertNotNull("no explanation for $id", MedicationTypes.forId(id)) }
+    fun `every medication type icon has a guide`() {
+        iconIds.forEach { id -> assertNotNull("no guide for $id", MedicationTypes.forId(id)) }
         assertEquals(iconIds.size, MedicationTypes.ALL.size)
     }
 
     @Test
-    fun `each explanation says what it is, how it helps, and gives examples`() {
+    fun `every guide fills in every section`() {
         MedicationTypes.ALL.forEach { info ->
-            assertTrue("${info.id}: what it is", info.whatItIs.length > 30)
-            assertTrue("${info.id}: how it helps", info.howItHelps.length > 30)
-            assertTrue("${info.id}: examples", info.examples.size >= 2)
+            assertTrue("${info.id}: examples", info.examples.isNotEmpty())
+            info.sections().forEach { (heading, body) ->
+                assertTrue("${info.id}: '$heading' is too short", body.trim().length > 40)
+            }
         }
     }
 
     @Test
-    fun `the message shown in the pop-up has all three parts and a safety note`() {
-        val message = MedicationTypes.forId("bronchodilators")!!.message()
+    fun `sections appear in the order a patient reads them`() {
+        val headings = MedicationTypes.forId("bronchodilators")!!.sections().map { it.first }
 
-        assertTrue(message.contains("What it is"))
-        assertTrue(message.contains("How it helps"))
-        assertTrue(message.contains("Examples"))
-        assertTrue(message.contains("Albuterol"))
-        assertTrue(message.contains(MedicationTypes.SAFETY_NOTE))
+        assertEquals(
+            listOf(
+                "Examples", "What it is", "What it's for", "How it works", "Common forms",
+                "How to use", "Common side effects", "Warnings", "Interactions", "Important"
+            ),
+            headings
+        )
     }
 
     @Test
-    fun `an unknown id has no explanation`() {
+    fun `every guide ends with the disclaimer`() {
+        MedicationTypes.ALL.forEach { info ->
+            assertEquals("${info.id}", MedicationTypes.DISCLAIMER, info.sections().last().second)
+        }
+        assertTrue(MedicationTypes.DISCLAIMER.contains("not medical advice"))
+    }
+
+    @Test
+    fun `the plain text version carries every heading and example`() {
+        val message = MedicationTypes.forId("bronchodilators")!!.message()
+
+        MedicationTypes.forId("bronchodilators")!!.sections().forEach { (heading, _) ->
+            assertTrue("missing heading $heading", message.contains(heading))
+        }
+        assertTrue(message.contains("Albuterol"))
+    }
+
+    @Test
+    fun `an unknown id has no guide`() {
         assertNull(MedicationTypes.forId("not-a-type"))
+    }
+
+    @Test
+    fun `no guide mentions Fasenra`() {
+        // Removed at the owner's request: benralizumab is not an approved COPD treatment.
+        MedicationTypes.ALL.forEach { info ->
+            val text = info.message().lowercase()
+            assertTrue("${info.id} mentions Fasenra", !text.contains("fasenra") && !text.contains("benralizumab"))
+        }
     }
 }
