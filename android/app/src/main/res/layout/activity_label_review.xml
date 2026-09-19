@@ -122,16 +122,36 @@
             android:textColor="@android:color/holo_orange_dark"
             android:visibility="gone" />
 
+        <TextView
+            android:id="@+id/moreNutrientsHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:layout_marginTop="16dp"
+            android:gravity="center_vertical"
+            android:background="?attr/selectableItemBackground"
+            android:text="@string/more_nutrients_show"
+            android:textAppearance="?attr/textAppearanceSubtitle1"
+            android:textColor="?attr/colorPrimary" />
+
+        <LinearLayout
+            android:id="@+id/moreNutrientsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
+            android:baselineAligned="false"
             android:layout_marginTop="24dp">
 
             <Button
                 android:id="@+id/addToLogButton"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
                 android:text="@string/add_to_todays_log" />
@@ -139,7 +159,7 @@
             <Button
                 android:id="@+id/saveToMyFoodsButton"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
                 android:text="@string/save_to_my_foods" />
@@ -149,13 +169,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
+            android:baselineAligned="false"
             android:layout_marginTop="8dp">
 
             <Button
                 android:id="@+id/retakeButton"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
                 android:text="@string/retake" />
@@ -164,7 +185,7 @@
                 android:id="@+id/cancelButton"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
                 android:text="@string/cancel" />

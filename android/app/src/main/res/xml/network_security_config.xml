@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Everything stays HTTPS-only. -->
+    <base-config cleartextTrafficPermitted="false" />
+
+    <!-- QR short-link hosts printed on food packages that do not serve valid HTTPS.
+         Only a redirect is fetched from them and no user data is sent (see ProductLinkResolver).
+         pepsico.info: PepsiCo SmartLabel QR codes (Quaker, Frito-Lay, Gatorade…); its certificate is expired. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">pepsico.info</domain>
+    </domain-config>
+</network-security-config>

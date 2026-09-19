@@ -157,6 +157,13 @@ class TrackingFragment : Fragment() {
         // COPD Health Tracking buttons
         binding.logOxygenButton.setOnClickListener { showOxygenDialog() }
         binding.importOxygenFromDeviceButton.setOnClickListener { importOxygenFromDevice() }
+        binding.importFromDeviceHelp.setOnClickListener {
+            androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle(R.string.tracking_import_how_it_works_title)
+                .setMessage(R.string.tracking_import_how_it_works_message)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+        }
         binding.logExerciseButton.setOnClickListener { showExerciseDialog() }
         
         // Quick Add Food and Add from favorites
@@ -1974,7 +1981,16 @@ class TrackingFragment : Fragment() {
             calories = entry.calories / factor,
             protein = entry.protein / factor,
             carbs = entry.carbs / factor,
-            fat = entry.fat / factor
+            fat = entry.fat / factor,
+            fiber = entry.fiber / factor,
+            sodium = entry.sodium / factor,
+            potassium = entry.potassium / factor,
+            calcium = entry.calcium / factor,
+            iron = entry.iron / factor,
+            vitaminD = entry.vitaminD / factor,
+            saturatedFat = entry.saturatedFat / factor,
+            cholesterol = entry.cholesterol / factor,
+            addedSugars = entry.addedSugars / factor
         )
         lifecycleScope.launch {
             viewModel.insertUserAddedFood(userFood)

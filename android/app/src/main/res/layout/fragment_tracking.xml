@@ -2560,7 +2560,8 @@
             <Button
                 android:id="@+id/quick_add_food_button"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="wrap_content"
+                android:minHeight="56dp"
                 android:text="+ Quick Add Food"
                 android:textSize="16sp"
                 android:textStyle="bold"
@@ -2570,7 +2571,8 @@
             <Button
                 android:id="@+id/add_from_favorites_button"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:text="Add from favorites"
                 android:textSize="14sp"
                 android:backgroundTint="#E5E7EB"
@@ -2580,7 +2582,8 @@
             <Button
                 android:id="@+id/create_meal_button"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:text="Create meal (add to favorites)"
                 android:textSize="14sp"
                 android:backgroundTint="#E5E7EB"
@@ -2764,7 +2767,19 @@
                 android:layout_height="44dp"
                 android:text="@string/tracking_import_from_device"
                 android:textSize="14sp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/import_from_device_help"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:gravity="center_vertical"
+                android:background="?attr/selectableItemBackground"
+                android:text="@string/tracking_import_how_it_works"
+                android:textSize="14sp"
+                android:textColor="?attr/colorPrimary"
+                android:layout_marginBottom="4dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"

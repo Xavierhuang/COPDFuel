@@ -9,6 +9,8 @@ data class ParsedLabel(
     val protein: ValueWithConfidence? = null,
     val carbs: ValueWithConfidence? = null,
     val fat: ValueWithConfidence? = null,
+    // Only nutrients that were actually found; a missing row is absent, not zero.
+    val extras: Map<ExtraNutrient, ValueWithConfidence> = emptyMap(),
     val rawLines: List<String> = emptyList()
 ) : Serializable
 

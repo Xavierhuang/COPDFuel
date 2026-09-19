@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,6 +18,8 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.copdhealthtracker.BuildConfig
 import com.copdhealthtracker.R
@@ -24,6 +27,7 @@ import com.copdhealthtracker.databinding.ActivityScanLabelBinding
 import com.copdhealthtracker.labelscan.MlKitBarcodeScanner
 import com.copdhealthtracker.labelscan.MlKitLabelOcr
 import com.copdhealthtracker.labelscan.NutritionLabelParser
+import com.copdhealthtracker.labelscan.ProductLinkResolver
 import com.copdhealthtracker.labelscan.UsdaGtinLookup
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
@@ -74,7 +78,14 @@ class ScanLabelActivity : AppCompatActivity() {
         binding = ActivityScanLabelBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        viewModel = androidx.lifecycle.ViewModelProvider(this)[LabelCaptureViewModel::class.java]
+        // Edge-to-edge is enforced on Android 15+; keep the controls clear of the system bars.
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
+
+        viewModel =androidx.lifecycle.ViewModelProvider(this)[LabelCaptureViewModel::class.java]
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         configureUiForScanMode()
@@ -105,10 +116,13 @@ class ScanLabelActivity : AppCompatActivity() {
     }
 
     private fun switchToLabelMode() {
-        val intent = Intent(this, ScanLabelActivity::class.java).apply {
+        // Forward the result so the caller that launched QR mode still receives the scanned entry.
+        val labelIntent = Intent(this, ScanLabelActivity::class.java).apply {
             putExtra(EXTRA_SCAN_MODE, SCAN_MODE_LABEL)
+            putExtra(EXTRA_DATE, intent.getLongExtra(EXTRA_DATE, System.currentTimeMillis()))
+            addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
         }
-        startActivity(intent)
+        startActivity(labelIntent)
         finish()
     }
 
@@ -162,8 +176,7 @@ class ScanLabelActivity : AppCompatActivity() {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     val savedUri = Uri.fromFile(photoFile)
                     if (isCapturingFront) {
-                        viewModel.frontLabelUri = savedUri
-                        proceedToNutritionLabel()
+                        handleFirstPhoto(savedUri)
                     } else {
                         viewModel.nutritionLabelUri = savedUri
                         processLabel()
@@ -171,6 +184,31 @@ class ScanLabelActivity : AppCompatActivity() {
                 }
             }
         )
+    }
+
+    // People often photograph the Nutrition Facts panel first. Treat that photo as the
+    // nutrition label instead of silently keeping it as the optional front photo.
+    private fun handleFirstPhoto(uri: Uri) {
+        binding.captureButton.isEnabled = false
+        binding.instructionText.text = getString(R.string.reading_label)
+
+        lifecycleScope.launch {
+            val isNutritionPanel = try {
+                NutritionLabelParser.looksLikeNutritionPanel(MlKitLabelOcr(this@ScanLabelActivity).recognize(uri))
+            } catch (e: Exception) {
+                false
+            }
+
+            binding.captureButton.isEnabled = true
+            proceedToNutritionLabel()
+            if (isNutritionPanel) {
+                viewModel.nutritionLabelUri = uri
+                processLabel()
+            } else {
+                viewModel.frontLabelUri = uri
+                Toast.makeText(this@ScanLabelActivity, R.string.front_photo_saved, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun proceedToNutritionLabel() {
@@ -237,9 +275,18 @@ class ScanLabelActivity : AppCompatActivity() {
             scanner.process(inputImage)
                 .addOnSuccessListener { barcodes ->
                     val gtin = barcodes.firstNotNullOfOrNull { MlKitBarcodeScanner.extractGtin(it.rawValue) }
+                    val link = barcodes.firstOrNull { ProductLinkResolver.isWebLink(it.rawValue) }?.rawValue
                     if (gtin != null) {
                         isQrLookupActive = true
+                        binding.instructionText.text = getString(R.string.looking_up_product)
                         lookupGtin(gtin)
+                    } else if (link != null && link !in unresolvableLinks) {
+                        // Package QR codes (e.g. SmartLabel) are usually short links to a product page.
+                        isQrLookupActive = true
+                        binding.instructionText.text = getString(R.string.looking_up_product)
+                        resolveLinkThenLookup(link)
+                    } else if (barcodes.isNotEmpty()) {
+                        binding.instructionText.text = getString(R.string.scan_code_without_gtin)
                     }
                 }
                 .addOnCompleteListener {
@@ -248,12 +295,35 @@ class ScanLabelActivity : AppCompatActivity() {
                 }
         }
 
+        // Links that led nowhere useful, so the same QR is not fetched again on every frame.
+        private val unresolvableLinks = mutableSetOf<String>()
+
+        private fun resolveLinkThenLookup(link: String) {
+            lifecycleScope.launch {
+                val gtin = try {
+                    ProductLinkResolver().resolveGtin(link)
+                } catch (e: Exception) {
+                    null
+                }
+                Log.d(TAG, "QR link $link -> gtin $gtin")
+                if (gtin != null) {
+                    lookupGtin(gtin)
+                } else {
+                    unresolvableLinks.add(link)
+                    isQrLookupActive = false
+                    binding.instructionText.text = getString(R.string.scan_code_without_gtin)
+                }
+            }
+        }
+
         private fun lookupGtin(gtin: String) {
+            Log.d(TAG, "Looking up gtin $gtin")
             lifecycleScope.launch(Dispatchers.IO) {
                 try {
                     val apiKey = BuildConfig.USDA_FDC_API_KEY
                     if (apiKey.isBlank()) {
                         withContext(Dispatchers.Main) {
+                            binding.instructionText.text = getString(R.string.usda_key_missing)
                             Toast.makeText(this@ScanLabelActivity, "USDA API key not configured", Toast.LENGTH_LONG).show()
                         }
                         return@launch
@@ -268,12 +338,14 @@ class ScanLabelActivity : AppCompatActivity() {
                             reviewLauncher.launch(intent)
                         } else {
                             isQrLookupActive = false
+                            binding.instructionText.text = getString(R.string.scan_qr_code_instruction)
                             Toast.makeText(this@ScanLabelActivity, "Product not found. Try scanning the label.", Toast.LENGTH_LONG).show()
                         }
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
                         isQrLookupActive = false
+                        binding.instructionText.text = getString(R.string.scan_qr_code_instruction)
                         Toast.makeText(this@ScanLabelActivity, "Lookup failed: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 }
@@ -298,6 +370,7 @@ class ScanLabelActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val TAG = "ScanLabelActivity"
         const val EXTRA_SCAN_MODE = "extra_scan_mode"
         const val EXTRA_DATE = "extra_date"
         const val SCAN_MODE_LABEL = 0
