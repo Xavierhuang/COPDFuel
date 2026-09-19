@@ -50,4 +50,12 @@
   <string name="expo_system_ui_user_interface_style" translatable="false">automatic</string>
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
+  <string name="add_food_title">Add Food</string>
+  <string name="add_food">Add Food</string>
+  <string name="scan_label">Scan Label</string>
+  <string name="scan_qr_code">Scan QR Code</string>
+  <string name="photo_library">Photo Library</string>
+  <string name="review_scanned_label">Review Scanned Label</string>
+  <string name="add_to_log">Add to Log</string>
+  <string name="save_to_my_foods">Save to My Foods</string>
 </resources>
