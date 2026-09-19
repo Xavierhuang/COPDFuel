@@ -16,6 +16,15 @@
         <package android:name="com.google.android.apps.healthdata" />
     </queries>
 
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    
     <application
         android:name=".utils.AppApplication"
         android:allowBackup="true"
@@ -89,6 +98,18 @@
 
         <activity
             android:name=".PaywallActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme" />
+
+        <activity
+            android:name=".ui.scan.ScanLabelActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme" />
+
+        <activity
+            android:name=".ui.scan.LabelReviewActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/AppTheme" />
