@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let users scan packaged-food labels with the in-app camera or gallery and pre-fill the existing dietary entry form with calories, protein, carbs, and fat.
+**Goal:** Let users scan packaged-food labels with the in-app camera or gallery, scan product QR codes for GTIN-based lookup, and pre-fill the existing dietary entry form with calories, protein, carbs, and fat.
 
-**Architecture:** A pure-Kotlin `NutritionLabelParser` sits behind a `LabelOcr` interface powered by on-device ML Kit. Camera capture uses CameraX. A `BottomSheetDialogFragment` offers Add Food / Scan Food / Photo Library, launching either the existing `AddFoodDialog` or a new `ScanLabelActivity` → `LabelReviewActivity` flow. Parsed values are returned to `AddFoodDialog` as editable manual-entry values.
+**Architecture:** A pure-Kotlin `NutritionLabelParser` sits behind a `LabelOcr` interface powered by on-device ML Kit. Camera capture uses CameraX. A `BottomSheetDialogFragment` offers Add Food / Scan Food / Scan QR Code / Photo Library, launching either the existing `AddFoodDialog` or a new `ScanLabelActivity` → `LabelReviewActivity` flow. QR codes are decoded on-device, their GTIN is looked up against USDA FoodData Central, and parsed values are returned to `AddFoodDialog` as editable manual-entry values.
 
-**Tech Stack:** Android Kotlin, CameraX, ML Kit Text Recognition v2, Room (existing), JUnit 4 (existing).
+**Tech Stack:** Android Kotlin, CameraX, ML Kit Text Recognition v2, ML Kit Barcode Scanning, Room (existing), JUnit 4 (existing).
 
 **Spec:** `docs/superpowers/specs/2026-09-18-food-label-scan-design.md`
 
@@ -26,7 +26,9 @@
 |------|----------------|
 | `labelscan/ParsedLabel.kt` | Data classes for parsed label output |
 | `labelscan/LabelOcr.kt` | OCR interface |
-| `labelscan/MlKitLabelOcr.kt` | ML Kit implementation |
+| `labelscan/MlKitLabelOcr.kt` | ML Kit text recognition implementation |
+| `labelscan/MlKitBarcodeScanner.kt` | ML Kit QR/barcode scanning implementation |
+| `labelscan/UsdaGtinLookup.kt` | Query USDA FDC by GTIN/UPC |
 | `labelscan/NutritionLabelParser.kt` | Pure Kotlin parser for Nutrition Facts text |
 | `ui/bottomsheets/AddFoodBottomSheet.kt` | Bottom sheet: Add Food / Scan Food / Photo Library |
 | `ui/scan/ScanLabelActivity.kt` | CameraX preview + capture front and nutrition labels |
@@ -67,6 +69,9 @@ implementation 'androidx.camera:camera-view:1.3.1'
 
 // ML Kit text recognition
 implementation 'com.google.mlkit:text-recognition:16.0.1'
+
+// ML Kit barcode scanning
+implementation 'com.google.mlkit:barcode-scanning:17.2.0'
 ```
 
 - [ ] **Step 2: Sync project**
@@ -556,7 +561,7 @@ git commit -m "test(labelscan): add NutritionLabelParser unit tests"
 - Modify: `app/src/main/res/values/strings.xml`
 
 **Interfaces:**
-- Produces: `AddFoodBottomSheet` with a listener callback `(action: Action) -> Unit` where `Action` is an enum: `ADD_FOOD`, `SCAN_FOOD`, `PHOTO_LIBRARY`.
+- Produces: `AddFoodBottomSheet` with a listener callback `(action: Action) -> Unit` where `Action` is an enum: `ADD_FOOD`, `SCAN_FOOD`, `SCAN_QR_CODE`, `PHOTO_LIBRARY`.
 
 - [ ] **Step 1: Define Action enum and listener inside the bottom sheet**
 
@@ -574,7 +579,7 @@ class AddFoodBottomSheet(
     private val onAction: (Action) -> Unit
 ) : BottomSheetDialogFragment() {
 
-    enum class Action { ADD_FOOD, SCAN_FOOD, PHOTO_LIBRARY }
+    enum class Action { ADD_FOOD, SCAN_FOOD, SCAN_QR_CODE, PHOTO_LIBRARY }
 
     private var _binding: BottomSheetAddFoodBinding? = null
     private val binding get() = _binding!!
@@ -592,6 +597,7 @@ class AddFoodBottomSheet(
         super.onViewCreated(view, savedInstanceState)
         binding.addFoodOption.setOnClickListener { dismissAndEmit(Action.ADD_FOOD) }
         binding.scanFoodOption.setOnClickListener { dismissAndEmit(Action.SCAN_FOOD) }
+        binding.scanQrCodeOption.setOnClickListener { dismissAndEmit(Action.SCAN_QR_CODE) }
         binding.photoLibraryOption.setOnClickListener { dismissAndEmit(Action.PHOTO_LIBRARY) }
     }
 
@@ -678,6 +684,29 @@ Use a `GridLayout` or `LinearLayout` with three options. Example:
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/scanQrCodeOption"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="12dp"
+            android:background="?attr/selectableItemBackground">
+
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_scan_qr_code"
+                android:contentDescription="@string/scan_qr_code" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/scan_qr_code"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/photoLibraryOption"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -711,6 +740,7 @@ In `app/src/main/res/values/strings.xml`:
     <string name="add_food_title">Add Food</string>
     <string name="add_food">Add Food</string>
     <string name="scan_food">Scan Food</string>
+    <string name="scan_qr_code">Scan QR Code</string>
     <string name="photo_library">Photo Library</string>
 ```
 
@@ -762,9 +792,10 @@ Expected: Build succeeds.
 git add app/src/main/java/com/copdhealthtracker/ui/bottomsheets/AddFoodBottomSheet.kt \
         app/src/main/res/layout/bottom_sheet_add_food.xml \
         app/src/main/res/drawable/ic_scan_food.xml \
+        app/src/main/res/drawable/ic_scan_qr_code.xml \
         app/src/main/res/drawable/ic_photo_library.xml \
         app/src/main/res/values/strings.xml
-git commit -m "feat: add AddFoodBottomSheet with Add Food, Scan Food, Photo Library options"
+git commit -m "feat: add AddFoodBottomSheet with Add Food, Scan Food, Scan QR Code, Photo Library options"
 ```
 
 ---
@@ -786,6 +817,7 @@ git commit -m "feat: add AddFoodBottomSheet with Add Food, Scan Food, Photo Libr
             when (action) {
                 AddFoodBottomSheet.Action.ADD_FOOD -> showAddFoodDialog()
                 AddFoodBottomSheet.Action.SCAN_FOOD -> launchScanFood()
+                AddFoodBottomSheet.Action.SCAN_QR_CODE -> launchScanQrCode()
                 AddFoodBottomSheet.Action.PHOTO_LIBRARY -> launchPhotoLibrary()
             }
         }.show(parentFragmentManager, "AddFoodBottomSheet")
@@ -803,7 +835,16 @@ git commit -m "feat: add AddFoodBottomSheet with Add Food, Scan Food, Photo Libr
     }
 
     private fun launchScanFood() {
-        val intent = android.content.Intent(requireContext(), com.copdhealthtracker.ui.scan.ScanLabelActivity::class.java)
+        val intent = android.content.Intent(requireContext(), com.copdhealthtracker.ui.scan.ScanLabelActivity::class.java).apply {
+            putExtra(ScanLabelActivity.EXTRA_SCAN_MODE, ScanLabelActivity.SCAN_MODE_LABEL)
+        }
+        scanLauncher.launch(intent)
+    }
+
+    private fun launchScanQrCode() {
+        val intent = android.content.Intent(requireContext(), com.copdhealthtracker.ui.scan.ScanLabelActivity::class.java).apply {
+            putExtra(ScanLabelActivity.EXTRA_SCAN_MODE, ScanLabelActivity.SCAN_MODE_QR)
+        }
         scanLauncher.launch(intent)
     }
 
@@ -1241,7 +1282,7 @@ git commit -m "feat: add ScanLabelActivity with CameraX preview and capture"
 - Create: `app/src/main/res/layout/activity_label_review.xml`
 
 **Interfaces:**
-- Consumes: `ParsedLabel` from intent extras (`EXTRA_NUTRITION_LABEL_URI` and optional front URI).
+- Consumes: `ParsedLabel` from intent extras (`EXTRA_NUTRITION_LABEL_URI` and optional front URI, or `EXTRA_PARSED_LABEL` for QR/USDA results).
 - Produces: `RESULT_OK` with `EXTRA_FOOD_ENTRY` containing a `FoodEntry`, or `RESULT_CANCELED`.
 
 - [ ] **Step 1: Write `LabelReviewActivity.kt`**
@@ -1299,6 +1340,13 @@ class LabelReviewActivity : AppCompatActivity() {
     }
 
     private fun loadParsedLabel() {
+        val parsedExtra = intent.getSerializableExtra(EXTRA_PARSED_LABEL) as? com.copdhealthtracker.labelscan.ParsedLabel
+        if (parsedExtra != null) {
+            parsedLabel = parsedExtra
+            bindValues()
+            return
+        }
+
         val uri = nutritionLabelUri ?: return
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -1395,6 +1443,7 @@ class LabelReviewActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_FRONT_LABEL_URI = "extra_front_label_uri"
         const val EXTRA_NUTRITION_LABEL_URI = "extra_nutrition_label_uri"
+        const val EXTRA_PARSED_LABEL = "extra_parsed_label"
         const val EXTRA_FOOD_ENTRY = "extra_food_entry"
     }
 }
@@ -1686,6 +1735,7 @@ Inside `setupBasicUI()`:
                 when (action) {
                     AddFoodBottomSheet.Action.ADD_FOOD -> { /* already in AddFoodDialog */ }
                     AddFoodBottomSheet.Action.SCAN_FOOD -> launchScanFromDialog()
+                    AddFoodBottomSheet.Action.SCAN_QR_CODE -> launchScanQrFromDialog()
                     AddFoodBottomSheet.Action.PHOTO_LIBRARY -> launchPhotoLibraryFromDialog()
                 }
             }.show(parentFragmentManager, "AddFoodBottomSheet")
@@ -1727,6 +1777,13 @@ Add activity result launchers and handlers:
             android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         )
         photoLibraryFromDialogLauncher.launch(intent)
+    }
+
+    private fun launchScanQrFromDialog() {
+        val intent = android.content.Intent(requireContext(), com.copdhealthtracker.ui.scan.ScanLabelActivity::class.java).apply {
+            putExtra(com.copdhealthtracker.ui.scan.ScanLabelActivity.EXTRA_SCAN_MODE, com.copdhealthtracker.ui.scan.ScanLabelActivity.SCAN_MODE_QR)
+        }
+        scanFromDialogLauncher.launch(intent)
     }
 
     private fun prefillFromScan(entry: FoodEntry) {
@@ -1826,7 +1883,7 @@ Expected: All tests pass.
 On a physical device or emulator:
 
 1. Open Tracking → tap "+ Quick Add Food".
-2. Bottom sheet appears with Add Food, Scan Food, Photo Library.
+2. Bottom sheet appears with Add Food, Scan Food, Scan QR Code, Photo Library.
 3. Tap Scan Food → grant camera permission.
 4. Capture front label (optional), then nutrition label.
 5. Review screen opens with calories, protein, carbs, fat pre-filled.
@@ -1834,10 +1891,420 @@ On a physical device or emulator:
 7. Verify food appears in the day's log.
 8. Repeat from inside `AddFoodDialog` camera icon.
 9. Tap Photo Library, select a label image, verify review opens.
+10. Tap Scan QR Code, point at a product QR code, verify USDA lookup or fallback to label scan.
 
 - [ ] **Step 4: Commit any fixes**
 
 Commit fixes as separate commits with clear messages.
+
+---
+
+### Task 16: Implement MlKitBarcodeScanner
+
+**Files:**
+- Create: `app/src/main/java/com/copdhealthtracker/labelscan/MlKitBarcodeScanner.kt`
+- Test: `app/src/test/java/com/copdhealthtracker/labelscan/MlKitBarcodeScannerTest.kt` (for GTIN parsing logic)
+
+**Interfaces:**
+- Produces: `fun extractGtin(barcodeValue: String): String?` pure helper.
+- Produces: `suspend fun scanFromUri(uri: Uri): String?` for gallery images.
+
+- [ ] **Step 1: Write the scanner interface and helpers**
+
+```kotlin
+package com.copdhealthtracker.labelscan
+
+import android.content.Context
+import android.net.Uri
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import java.io.IOException
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+
+class MlKitBarcodeScanner(private val context: Context) {
+
+    private val scanner = BarcodeScanning.getClient(
+        BarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+            .build()
+    )
+
+    suspend fun scanFromUri(uri: Uri): String? = withContext(Dispatchers.IO) {
+        val image = try {
+            InputImage.fromFilePath(context, uri)
+        } catch (e: IOException) {
+            return@withContext null
+        }
+        suspendCancellableCoroutine { continuation ->
+            scanner.process(image)
+                .addOnSuccessListener { barcodes ->
+                    continuation.resume(barcodes.firstNotNullOfOrNull { extractGtin(it.rawValue) })
+                }
+                .addOnFailureListener { e ->
+                    continuation.resumeWithException(e)
+                }
+        }
+    }
+
+    companion object {
+        fun extractGtin(value: String?): String? {
+            if (value.isNullOrBlank()) return null
+
+            // GS1 Digital Link: https://id.gs1.org/gtin/014200000036
+            val gs1Regex = Regex("https?://[^/]+/gtin/(\\d+)", RegexOption.IGNORE_CASE)
+            gs1Regex.find(value)?.groupValues?.get(1)?.let { return it }
+
+            // Raw numeric GTIN/UPC/EAN (8, 12, 13, or 14 digits)
+            val numeric = value.replace(Regex("[^\\d]"), "")
+            return if (numeric.length in listOf(8, 12, 13, 14)) numeric else null
+        }
+    }
+}
+```
+
+- [ ] **Step 2: Write unit tests for extractGtin**
+
+```kotlin
+package com.copdhealthtracker.labelscan
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class MlKitBarcodeScannerTest {
+
+    @Test
+    fun `extracts GTIN from GS1 Digital Link`() {
+        assertEquals("014200000036", MlKitBarcodeScanner.extractGtin("https://id.gs1.org/gtin/014200000036"))
+    }
+
+    @Test
+    fun `extracts GTIN from raw UPC`() {
+        assertEquals("036000291452", MlKitBarcodeScanner.extractGtin("036000291452"))
+    }
+
+    @Test
+    fun `returns null for non-product QR`() {
+        assertNull(MlKitBarcodeScanner.extractGtin("https://example.com/coupon"))
+    }
+}
+```
+
+- [ ] **Step 3: Run tests**
+
+Run: `./gradlew :app:testDebugUnitTest`
+
+Expected: Tests pass.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app/src/main/java/com/copdhealthtracker/labelscan/MlKitBarcodeScanner.kt \
+        app/src/test/java/com/copdhealthtracker/labelscan/MlKitBarcodeScannerTest.kt
+git commit -m "feat(labelscan): add QR barcode scanner with GTIN extraction"
+```
+
+---
+
+### Task 17: Implement UsdaGtinLookup
+
+**Files:**
+- Create: `app/src/main/java/com/copdhealthtracker/labelscan/UsdaGtinLookup.kt`
+- Test: `app/src/test/java/com/copdhealthtracker/labelscan/UsdaGtinLookupTest.kt`
+
+**Interfaces:**
+- Produces: `suspend fun lookup(gtin: String, apiKey: String): ParsedLabel?`.
+
+- [ ] **Step 1: Write the lookup class**
+
+```kotlin
+package com.copdhealthtracker.labelscan
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.URL
+import java.net.URLEncoder
+
+class UsdaGtinLookup {
+
+    suspend fun lookup(gtin: String, apiKey: String): ParsedLabel? = withContext(Dispatchers.IO) {
+        val url = "https://api.nal.usda.gov/fdc/v1/foods/search?query=${URLEncoder.encode(gtin, "UTF-8")}&dataType=Branded&pageSize=1&api_key=$apiKey"
+        val response = URL(url).readText()
+        val json = JSONObject(response)
+        val foods = json.optJSONArray("foods") ?: return@withContext null
+        if (foods.length() == 0) return@withContext null
+
+        val food = foods.getJSONObject(0)
+        val description = food.optString("description", "Scanned food")
+        val servingSize = food.optDouble("servingSize", 100.0)
+        val servingUnit = food.optString("servingSizeUnit", "g")
+        val servingDesc = "$servingSize $servingUnit"
+
+        var calories = 0.0
+        var protein = 0.0
+        var carbs = 0.0
+        var fat = 0.0
+
+        val nutrients = food.optJSONArray("foodNutrients")
+        if (nutrients != null) {
+            for (i in 0 until nutrients.length()) {
+                val nutrient = nutrients.getJSONObject(i)
+                val nutrientId = nutrient.optInt("nutrientId", 0)
+                val value = nutrient.optDouble("value", 0.0)
+                when (nutrientId) {
+                    1008 -> calories = value
+                    1003 -> protein = value
+                    1005 -> carbs = value
+                    1004 -> fat = value
+                }
+            }
+        }
+
+        ParsedLabel(
+            productName = description,
+            servingSize = ServingSize(servingDesc, if (servingUnit == "g") servingSize else null),
+            calories = ValueWithConfidence(calories, "kcal", Confidence.HIGH),
+            protein = ValueWithConfidence(protein, "g", Confidence.HIGH),
+            carbs = ValueWithConfidence(carbs, "g", Confidence.HIGH),
+            fat = ValueWithConfidence(fat, "g", Confidence.HIGH)
+        )
+    }
+}
+```
+
+- [ ] **Step 2: Write a mocked unit test**
+
+Use a test fixture JSON file in `app/src/test/resources/usda_gtin_response.json` and a package-private helper, or mock `URL.readText()`. For simplicity, test the mapping logic with a helper function.
+
+```kotlin
+package com.copdhealthtracker.labelscan
+
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class UsdaGtinLookupTest {
+
+    @Test
+    fun `maps USDA food nutrients to ParsedLabel`() {
+        val json = """
+            {
+              "foods": [{
+                "description": "Test Cereal",
+                "servingSize": 55.0,
+                "servingSizeUnit": "g",
+                "foodNutrients": [
+                  {"nutrientId": 1008, "value": 210.0},
+                  {"nutrientId": 1003, "value": 5.0},
+                  {"nutrientId": 1005, "value": 42.0},
+                  {"nutrientId": 1004, "value": 3.0}
+                ]
+              }]
+            }
+        """.trimIndent()
+
+        val result = UsdaGtinLookup.mapResponse(json)
+
+        assertEquals("Test Cereal", result?.productName)
+        assertEquals(210.0, result?.calories?.value)
+        assertEquals(5.0, result?.protein?.value)
+        assertEquals(42.0, result?.carbs?.value)
+        assertEquals(3.0, result?.fat?.value)
+        assertEquals(55.0, result?.servingSize?.grams)
+    }
+}
+```
+
+To support this, refactor `lookup` to call `mapResponse(jsonString)` internally.
+
+- [ ] **Step 3: Run tests**
+
+Run: `./gradlew :app:testDebugUnitTest`
+
+Expected: Tests pass.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app/src/main/java/com/copdhealthtracker/labelscan/UsdaGtinLookup.kt \
+        app/src/test/java/com/copdhealthtracker/labelscan/UsdaGtinLookupTest.kt
+git commit -m "feat(labelscan): add USDA GTIN lookup"
+```
+
+---
+
+### Task 18: Add QR scanning mode to ScanLabelActivity
+
+**Files:**
+- Modify: `app/src/main/java/com/copdhealthtracker/ui/scan/ScanLabelActivity.kt`
+- Modify: `app/src/main/res/layout/activity_scan_label.xml`
+
+**Interfaces:**
+- Consumes: `MlKitBarcodeScanner`, `UsdaGtinLookup`.
+- Produces: In `SCAN_MODE_QR`, detects QR codes and launches `LabelReviewActivity` with USDA data or falls back to label mode.
+
+- [ ] **Step 1: Read scan mode from intent**
+
+In `ScanLabelActivity.onCreate`, before `startCamera()`:
+
+```kotlin
+    private val scanMode: Int by lazy {
+        intent.getIntExtra(EXTRA_SCAN_MODE, SCAN_MODE_LABEL)
+    }
+```
+
+Add to companion object:
+
+```kotlin
+        const val EXTRA_SCAN_MODE = "extra_scan_mode"
+        const val SCAN_MODE_LABEL = 0
+        const val SCAN_MODE_QR = 1
+```
+
+- [ ] **Step 2: Configure QR mode UI**
+
+In `activity_scan_label.xml`, add a QR framing overlay and a "Scan nutrition label instead" button. Hide the capture button and skip button in QR mode; show them in label mode.
+
+In `onCreate`:
+
+```kotlin
+    if (scanMode == SCAN_MODE_QR) {
+        binding.captureButton.visibility = View.GONE
+        binding.skipFrontButton.visibility = View.GONE
+        binding.instructionText.text = "Point camera at product QR code"
+        binding.switchToLabelButton.visibility = View.VISIBLE
+        binding.switchToLabelButton.setOnClickListener {
+            startActivity(Intent(this, ScanLabelActivity::class.java).apply {
+                putExtra(EXTRA_SCAN_MODE, SCAN_MODE_LABEL)
+            })
+            finish()
+        }
+    }
+```
+
+- [ ] **Step 3: Add ImageAnalysis for barcode detection**
+
+In `startCamera()`, when `scanMode == SCAN_MODE_QR`, bind an `ImageAnalysis` use case:
+
+```kotlin
+    private fun startCamera() {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture.addListener({
+            val cameraProvider = cameraProviderFuture.get()
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(binding.previewView.surfaceProvider)
+            }
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+            try {
+                cameraProvider.unbindAll()
+                if (scanMode == SCAN_MODE_QR) {
+                    val imageAnalysis = ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build()
+                        .also { it.setAnalyzer(cameraExecutor, QrCodeAnalyzer()) }
+                    cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis)
+                } else {
+                    imageCapture = ImageCapture.Builder().build()
+                    cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture)
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this, "Camera failed to start", Toast.LENGTH_SHORT).show()
+            }
+        }, ContextCompat.getMainExecutor(this))
+    }
+```
+
+- [ ] **Step 4: Implement QrCodeAnalyzer**
+
+Add an inner class:
+
+```kotlin
+    private inner class QrCodeAnalyzer : ImageAnalysis.Analyzer {
+
+        private val barcodeScanner = MlKitBarcodeScanner(this@ScanLabelActivity)
+        private var isProcessing = false
+
+        @androidx.camera.core.ExperimentalGetImage
+        override fun analyze(imageProxy: androidx.camera.core.ImageProxy) {
+            if (isProcessing) {
+                imageProxy.close()
+                return
+            }
+            isProcessing = true
+
+            val mediaImage = imageProxy.image ?: run {
+                imageProxy.close()
+                isProcessing = false
+                return
+            }
+
+            val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+            val scanner = com.google.mlkit.vision.barcode.BarcodeScanning.getClient()
+            scanner.process(inputImage)
+                .addOnSuccessListener { barcodes ->
+                    val gtin = barcodes.firstNotNullOfOrNull { MlKitBarcodeScanner.extractGtin(it.rawValue) }
+                    if (gtin != null) {
+                        lookupGtin(gtin)
+                    }
+                }
+                .addOnCompleteListener {
+                    imageProxy.close()
+                    isProcessing = false
+                }
+        }
+
+        private fun lookupGtin(gtin: String) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    val apiKey = com.copdhealthtracker.BuildConfig.USDA_FDC_API_KEY
+                    val parsed = UsdaGtinLookup().lookup(gtin, apiKey)
+                    withContext(Dispatchers.Main) {
+                        if (parsed != null) {
+                            val intent = Intent(this@ScanLabelActivity, LabelReviewActivity::class.java).apply {
+                                putExtra(LabelReviewActivity.EXTRA_PARSED_LABEL, parsed)
+                            }
+                            reviewLauncher.launch(intent)
+                        } else {
+                            Toast.makeText(this@ScanLabelActivity, "Product not found. Try scanning the label.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@ScanLabelActivity, "Lookup failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    }
+```
+
+Note: Passing `ParsedLabel` directly requires it to be `Parcelable` or `Serializable`. Either make `ParsedLabel` serializable (it contains only primitives and enums) or pass the nutrition label URI and re-parse. For simplicity, make `ParsedLabel`, `ServingSize`, and `ValueWithConfidence` implement `java.io.Serializable`.
+
+- [ ] **Step 5: Make ParsedLabel serializable**
+
+Add `: java.io.Serializable` to `ParsedLabel`, `ServingSize`, and `ValueWithConfidence`. `Confidence` enum is already serializable.
+
+- [ ] **Step 6: Build check**
+
+Run: `./gradlew :app:assembleDebug`
+
+Expected: Build succeeds.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add app/src/main/java/com/copdhealthtracker/ui/scan/ScanLabelActivity.kt \
+        app/src/main/res/layout/activity_scan_label.xml \
+        app/src/main/java/com/copdhealthtracker/labelscan/ParsedLabel.kt
+git commit -m "feat: add QR scanning mode to ScanLabelActivity"
+```
 
 ---
 
@@ -1848,16 +2315,19 @@ Commit fixes as separate commits with clear messages.
 | Spec requirement | Task |
 |------------------|------|
 | On-device ML Kit OCR | Task 4 |
+| On-device QR/barcode scanning | Task 16 |
+| USDA GTIN lookup | Task 17 |
 | In-app CameraX preview | Task 10 |
 | CAMERA permission | Task 2 |
 | Gallery import | Task 7, 8 |
 | Bottom-sheet entry from Tracking | Task 8 |
 | Bottom-sheet/camera entry from AddFoodDialog | Task 13 |
 | Review screen with editable values | Task 11 |
-| Macros only (cal/pro/carbs/fat) | Task 5, 11 |
+| Macros only (cal/pro/carbs/fat) | Task 5, 11, 17, 18 |
 | Save to my foods gated on grams | Task 11, 12 |
 | Cache image cleanup | Task 14 |
 | Parser unit tests | Task 6 |
+| QR scan mode with USDA fallback | Task 18 |
 
 ### 2. Placeholder scan
 
@@ -1868,13 +2338,14 @@ No TBD/TODO placeholders remain in the plan steps. Some UI strings are represent
 - `LabelOcr.recognize(uri: Uri): String` is used by `ScanLabelActivity` and `LabelReviewActivity`.
 - `NutritionLabelParser.parse(text: String): ParsedLabel` is consistent.
 - `FoodEntry` is `@Parcelize` and used as `getParcelableExtra` / `putExtra`.
-- `LabelReviewActivity` extras `EXTRA_FRONT_LABEL_URI`, `EXTRA_NUTRITION_LABEL_URI`, `EXTRA_FOOD_ENTRY`, `EXTRA_SAVE_TO_DATABASE` are consistent across Tasks 10, 11, 12, 13.
+- `LabelReviewActivity` extras `EXTRA_FRONT_LABEL_URI`, `EXTRA_NUTRITION_LABEL_URI`, `EXTRA_PARSED_LABEL`, `EXTRA_FOOD_ENTRY`, `EXTRA_SAVE_TO_DATABASE` are consistent across Tasks 10, 11, 12, 13, 18. `ParsedLabel` is `Serializable` for the QR flow.
 
 ### Known refinements needed during execution
 
 - The initial parser (Task 5) does not yet handle two-column panels. If label fixtures show this is needed, extend `extractValue` to detect column headers and select the correct column.
 - `LabelReviewActivity` re-runs OCR; consider passing the already-parsed result from `ScanLabelActivity` via `LabelCaptureViewModel` or intent to avoid duplicate work.
 - `FoodEntry` Parcelable change is a model change; ensure Room schema migration is not triggered (adding `@Parcelize` does not change the schema).
+- For QR mode, consider debouncing frame analysis to avoid repeated lookups of the same code.
 
 ---
 
