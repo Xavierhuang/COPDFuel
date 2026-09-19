@@ -1612,7 +1612,7 @@ class ResourcesFragment : Fragment() {
         container.addView(TextView(ctx).apply {
             text = "Medication Types"
             textSize = 22f
-            setTypeface(null, android.graphics.Typeface.BOLD or android.graphics.Typeface.ITALIC)
+            setTypeface(null, android.graphics.Typeface.BOLD_ITALIC)
             setTextColor(primaryColor)
             setPadding(0, 0, 0, 16)
         })
