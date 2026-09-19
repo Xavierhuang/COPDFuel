@@ -20,16 +20,34 @@ object NutritionLabelParser {
     }
 
     private fun normalizeLine(line: String): String {
-        return line
+        val chars = line.toCharArray()
+        val lastIndex = chars.lastIndex
+        for (i in chars.indices) {
+            when (chars[i].lowercaseChar()) {
+                'o' -> if (i > 0 && chars[i - 1].isDigit()) chars[i] = '0'
+                'l' -> if (i < lastIndex && chars[i + 1].isDigit()) chars[i] = '1'
+                's' -> if (i > 0 && chars[i - 1].isDigit()) chars[i] = '5'
+                '1' -> {
+                    // Treat a lone 1 inside a word as 'i' (e.g. Prote1n) and a 1 at
+                    // the end of a word as 'l' (e.g. Tota1).
+                    val prevLetter = i > 0 && chars[i - 1].isLetter()
+                    val nextLetter = i < lastIndex && chars[i + 1].isLetter()
+                    val atWordEnd = i == lastIndex || chars[i + 1].isWhitespace()
+                    if (prevLetter && nextLetter) {
+                        chars[i] = 'i'
+                    } else if (prevLetter && atWordEnd) {
+                        chars[i] = 'l'
+                    }
+                }
+            }
+        }
+        return String(chars)
             .replace(Regex("\\s+"), " ")
-            .replace(Regex("(?<=\\d)[oO](?=\\d|\\s|g|mg|kcal|$)"), "0")
-            .replace(Regex("(?<=^|\\s)[lL](?=\\d)"), "1")
-            .replace(Regex("(?<=\\d)[sS](?=\\s|g|mg|kcal|$)"), "5")
             .lowercase()
     }
 
     private fun extractServingSize(text: String): ServingSize? {
-        val regex = Regex("serving size\\s+(.+?)(?=\\n|\\$)", RegexOption.IGNORE_CASE)
+        val regex = Regex("serving size\\s+(.+?)(?=\\n|\$)", RegexOption.IGNORE_CASE)
         val match = regex.find(text) ?: return null
         val description = match.groupValues[1].trim()
         val grams = Regex("\\((\\d+(?:\\.\\d+)?)\\s*g\\)", RegexOption.IGNORE_CASE)
