@@ -29,8 +29,8 @@ class RecipesFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.title.text = "COPD-Friendly Recipes"
-        binding.subtitle.text = "Nutritious and delicious recipes that are easy to prepare and gentle on your respiratory system."
+        binding.title.text = "COPD-Friendly Meals"
+        binding.subtitle.text = "Nutritious and delicious meal ideas that are easy to prepare and gentle on your respiratory system."
         addMealIdeasContent()
     }
 
