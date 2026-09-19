@@ -1,7 +1,7 @@
 # Food Label Scanning — Design Spec
 
 **Date:** 2026-09-18
-**Scope:** Let the Android app take photos of packaged-food labels and pre-fill the dietary section with macronutrients.
+**Scope:** Let the Android app scan packaged-food labels via photo, QR code, or gallery import and pre-fill the dietary section with macronutrients.
 **Platform:** Android (`android/`), Kotlin, `minSdk 26`.
 
 ## Decisions made
@@ -9,8 +9,10 @@
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Recognition engine | Google ML Kit Text Recognition v2 on-device | No photo leaves the phone; no backend/BA work; no network dependency. |
+| Barcode/QR engine | Google ML Kit Barcode Scanning on-device | Detects QR codes in camera preview or gallery images; GTIN/UPC is then sent to USDA FoodData Central for lookup. |
 | Photo capture | In-app CameraX preview with `CAMERA` permission | Matches the Cronometer-style flow: bottom sheet → camera permission → live preview with capture button. |
 | Gallery import | Yes | Users can pick an existing label photo from the gallery. Uses read-media permission, not camera. |
+| QR code fallback | Photo nutrition label scan | If QR code does not contain a usable GTIN, or USDA has no match, user falls back to taking a photo of the nutrition label. |
 | Serving-size handling | Trust the label; if grams are absent, allow the meal entry but do not offer "Add to my food database" | The food database stores nutrients **per 100g**; silently guessing a gram weight corrupts reusable entries. |
 | Nutrients scanned | Calories, Protein, Carbs, Fat only | Keep the existing lung-function-focused macro labels already used in Tracking and reports. |
 | Front-label photo | Optional | The front label only supplies the product name; the feature works with the nutrition panel alone. |
@@ -30,19 +32,19 @@ Three layers, each isolated behind a small interface:
 ┌─────────────────────────────────────────────────────────────┐
 │ UI: AddFoodBottomSheet + ScanLabelActivity +                 │
 │     LabelReviewActivity                                      │
-│   - Bottom sheet chooses Add Food / Scan Food / Gallery      │
-│   - CameraX preview captures front label (optional) and      │
-│     nutrition label (required)                               │
+│   - Bottom sheet chooses Add Food / Scan Food /              │
+│     Scan QR Code / Photo Library                             │
+│   - CameraX preview captures QR codes, front label, and      │
+│     nutrition label                                          │
 │   - Review screen shows editable parsed values               │
 ├─────────────────────────────────────────────────────────────┤
-│ Domain: NutritionLabelParser                                 │
-│   - Pure Kotlin, zero Android imports                        │
-│   - Input: raw OCR text                                      │
-│   - Output: ParsedLabel (macros + serving info + confidence) │
+│ Domain: NutritionLabelParser + UsdaGtinLookup                │
+│   - Parser: pure Kotlin string-to-struct for OCR text        │
+│   - Lookup: query USDA FDC by GTIN/UPC, map to ParsedLabel   │
 ├─────────────────────────────────────────────────────────────┤
-│ Infra: MlKitLabelOcr                                         │
-│   - Interface LabelOcr                                       │
-│   - ML Kit text recognition                                  │
+│ Infra: MlKitLabelOcr + MlKitBarcodeScanner                   │
+│   - LabelOcr: ML Kit text recognition                        │
+│   - BarcodeScanner: ML Kit QR/barcode scanning               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -116,34 +118,68 @@ Parsing strategy:
    - `MEDIUM`: value found but on a noisy or merged line, or the keyword is a near match.
    - `LOW`: number found without a unit, or in a two-column panel where the column selection is uncertain.
 
-### 3. `AddFoodBottomSheet`
+### 3. `MlKitBarcodeScanner` + `UsdaGtinLookup`
+
+QR-code path:
+
+1. **Barcode scanning**
+   - Uses ML Kit `BarcodeScanning.getClient(BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build())`.
+   - Can operate on a CameraX `ImageProxy` stream for live preview detection, or on a static `Uri` for gallery images.
+   - Returns a list of `Barcode` objects.
+
+2. **GTIN/UPC extraction**
+   - If `barcode.valueType == Barcode.TYPE_PRODUCT`, use `barcode.displayValue` directly (usually 12 or 13 digits).
+   - If the QR contains a URL matching GS1 Digital Link (`https://id.gs1.org/gtin/<digits>`), parse the GTIN from the path.
+   - Otherwise, treat QR as unhelpful and fall back to nutrition-label photo.
+
+3. **USDA lookup**
+   - Query `https://api.nal.usda.gov/fdc/v1/foods/search?query=<gtin>&dataType=Branded&pageSize=1&api_key=<key>`.
+   - Map the first result's `foodNutrients` to a `ParsedLabel`:
+     - nutrientId `1008` → calories
+     - nutrientId `1003` → protein
+     - nutrientId `1005` → carbs
+     - nutrientId `1004` → fat
+   - Use `servingSize` and `servingSizeUnit` from the USDA item for the serving description.
+   - Confidence is `HIGH` because the data is structured.
+
+### 4. `AddFoodBottomSheet`
 
 A `BottomSheetDialogFragment` launched from the Tracking screen's add action and from `AddFoodDialog`:
 
-- Grid of options: **Add Food**, **Scan Food**, **Photo Library**, **Add Exercise**, etc.
-- Tapping **Scan Food** requests `CAMERA` permission, then launches `ScanLabelActivity`.
-- Tapping **Photo Library** requests the appropriate read-media permission for the Android version, then launches the photo picker and sends the selected URI to `LabelReviewActivity`.
+- Grid of options: **Add Food**, **Scan Food**, **Scan QR Code**, **Photo Library**, **Add Exercise**, etc.
+- Tapping **Scan Food** requests `CAMERA` permission, then launches `ScanLabelActivity` in label-photo mode.
+- Tapping **Scan QR Code** requests `CAMERA` permission, then launches `ScanLabelActivity` in QR-scanning mode.
+- Tapping **Photo Library** requests the appropriate read-media permission for the Android version, then launches the photo picker. The selected image is first checked for a QR code; if none is found, it is treated as a nutrition-label photo and sent to `LabelReviewActivity`.
 
-### 4. `ScanLabelActivity`
+### 5. `ScanLabelActivity`
 
-A full-screen `AppCompatActivity` built on CameraX:
+A full-screen `AppCompatActivity` built on CameraX. Launched in one of two modes via an `EXTRA_SCAN_MODE` intent extra:
+
+- `SCAN_MODE_LABEL` — label photo capture.
+- `SCAN_MODE_QR` — live QR code detection.
 
 1. **Permission check**
    - If `CAMERA` permission is not granted, request it via `ActivityResultContracts.RequestPermission()`.
    - If denied permanently, show a message with a link to app settings.
-2. **Preview**
+2. **QR mode preview**
+   - `PreviewView` with a square QR framing overlay.
+   - CameraX `ImageAnalysis` feeds frames to `MlKitBarcodeScanner`.
+   - On detection, extract GTIN and call `UsdaGtinLookup`.
+   - If USDA returns a match, launch `LabelReviewActivity`.
+   - If no usable QR or no USDA match, show a message and offer to switch to label-photo mode.
+3. **Label mode preview**
    - `PreviewView` with a centered rectangle overlay indicating where to position the label.
    - Toggle flash button and zoom pinch gesture.
    - Instructional caption that switches between "Photo front of package (optional)" and "Photo Nutrition Facts panel".
-3. **Capture**
+4. **Capture**
    - `ImageCapture.takePicture()` writes the JPEG to the app's private `cacheDir`.
    - Front label is captured first and stored; then the view prompts for the nutrition label.
    - After the nutrition label is captured, run OCR + parser and launch `LabelReviewActivity`.
-4. **Navigation**
+5. **Navigation**
    - Back button returns to the previous step or cancels.
    - On parsing failure, show a retry overlay instead of leaving the activity.
 
-### 5. `LabelReviewActivity`
+### 6. `LabelReviewActivity`
 
 Displays the parsed values as editable fields:
 
@@ -164,7 +200,7 @@ Actions:
 - **"Retake"** — goes back to `ScanLabelActivity`.
 - **"Cancel"** — discards.
 
-### 6. Integration with `AddFoodDialog` and Tracking
+### 7. Integration with `AddFoodDialog` and Tracking
 
 Two entry points:
 
@@ -186,44 +222,58 @@ User taps "+" on Tracking or camera icon in AddFoodDialog
         ▼
 AddFoodBottomSheet
         │
-        ├─ Add Food ───────┐
-        │                   ▼
-        │            AddFoodDialog (existing)
-        │                   │
-        ├─ Scan Food ──────┤
-        │                   ▼
-        │            ScanLabelActivity (CameraX)
-        │                   │
+        ├─ Add Food ───────────────┐
+        │                           ▼
+        │                    AddFoodDialog (existing)
+        │                           │
+        ├─ Scan Food ──────────────┤
+        │                           ▼
+        │                    ScanLabelActivity (CameraX, label mode)
+        │                           │
         │            front label photo (optional)
-        │                   │
+        │                           │
         │            nutrition label photo (required)
-        │                   │
+        │                           │
         │            MlKitLabelOcr.recognize(uri) → raw text
-        │                   │
+        │                           │
         │            NutritionLabelParser.parse(text) → ParsedLabel
-        │                   │
-        │                   ▼
+        │                           │
+        │                           ▼
         │            LabelReviewActivity (editable fields, LOW highlighted)
-        │                   │
-        └─ Photo Library ───┤
+        │                           │
+        ├─ Scan QR Code ───────────┤
+        │                           ▼
+        │            ScanLabelActivity (CameraX, QR mode)
+        │                           │
+        │            MlKitBarcodeScanner.detect(image) → Barcode
+        │                           │
+        │            extract GTIN/UPC
+        │                           │
+        │            UsdaGtinLookup.query(gtin) → ParsedLabel
+        │                           │
+        │                           ▼
+        │            LabelReviewActivity
+        │                           │
+        └─ Photo Library ───────────┤
+                                    │
+                                    ▼
+                            Gallery photo picker URI
+                                    │
+                                    ▼
+                            MlKitBarcodeScanner.detect(uri)
+                                    │
+                            ├─ QR found ──▶ UsdaGtinLookup.query(gtin)
                             │
-                            ▼
-                    Gallery photo picker URI
-                            │
-                            ▼
-                    MlKitLabelOcr.recognize(uri) → raw text
-                            │
-                            ▼
-                    NutritionLabelParser.parse(text) → ParsedLabel
-                            │
-                            ▼
-                    LabelReviewActivity
-                            │
-                            ▼
-                    AddFoodDialog manual section
-                            │
-                            ▼
-                    Existing Save path → FoodEntry
+                            └─ No QR ─────▶ MlKitLabelOcr + NutritionLabelParser
+                                    │
+                                    ▼
+                            LabelReviewActivity
+                                    │
+                                    ▼
+                            AddFoodDialog manual section
+                                    │
+                                    ▼
+                            Existing Save path → FoodEntry
 ```
 
 ## Error handling
@@ -238,10 +288,14 @@ AddFoodBottomSheet
 | OCR throws (ML Kit error) | Toast: "Could not read label. Please try again." |
 | Camera permission denied | Show rationale; if permanently denied, link to Settings |
 | Read-media permission denied | Disable Photo Library option or link to Settings |
+| QR code detected but no GTIN | Offer to switch to label-photo mode |
+| GTIN found but USDA has no match | Offer to switch to label-photo mode |
+| USDA lookup fails (network) | Toast: "Could not look up product. Try scanning the label instead." |
 
 ## Security / HIPAA
 
 - No image or OCR text is uploaded. ML Kit bundled text recognition runs entirely on-device.
+- QR code scanning runs entirely on-device; only the extracted GTIN/UPC digits are sent to the USDA FoodData Central API. No PHI is transmitted.
 - The captured photos are written to the app's private `cacheDir`; delete them after OCR completes or when the activity is finished, whichever comes last.
 - Gallery imports are read-only; no copy is retained beyond the cache used for OCR.
 - Because no PHI leaves the device for this feature, no BAA amendment is needed.
@@ -259,9 +313,12 @@ implementation 'androidx.camera:camera-view:1.3.1'
 
 // ML Kit text recognition
 implementation 'com.google.mlkit:text-recognition:16.0.1'
+
+// ML Kit barcode scanning
+implementation 'com.google.mlkit:barcode-scanning:17.2.0'
 ```
 
-APK impact: ~5–6 MB total. This is acceptable relative to the existing 24.2 MB `assets/food_database.json`.
+APK impact: ~6–7 MB total. This is acceptable relative to the existing 24.2 MB `assets/food_database.json`.
 
 ## Permissions
 
@@ -285,6 +342,8 @@ A Play Store declaration will be required for the `CAMERA` permission because th
 
 - `app/src/main/java/com/copdhealthtracker/labelscan/LabelOcr.kt`
 - `app/src/main/java/com/copdhealthtracker/labelscan/MlKitLabelOcr.kt`
+- `app/src/main/java/com/copdhealthtracker/labelscan/MlKitBarcodeScanner.kt`
+- `app/src/main/java/com/copdhealthtracker/labelscan/UsdaGtinLookup.kt`
 - `app/src/main/java/com/copdhealthtracker/labelscan/NutritionLabelParser.kt`
 - `app/src/main/java/com/copdhealthtracker/labelscan/ParsedLabel.kt`
 - `app/src/main/java/com/copdhealthtracker/ui/bottomsheets/AddFoodBottomSheet.kt`
@@ -320,6 +379,13 @@ Test fixtures (canned OCR text) should cover:
 5. Label with serving size but no gram weight.
 6. OCR-noisy text (`Tota1 Fat 8g`, `Prote1n`, `Calories 1OO`).
 7. Front-label product name extraction.
+
+QR / GTIN tests should cover:
+
+1. GS1 Digital Link URL parsed to GTIN.
+2. Raw UPC-A/EAN-13 string parsed to GTIN.
+3. Non-product QR code falls back to label-photo mode.
+4. USDA response mapping to `ParsedLabel` (mocked JSON fixture).
 
 ## Open questions / future work
 
