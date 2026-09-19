@@ -9,10 +9,12 @@
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Recognition engine | Google ML Kit Text Recognition v2 on-device | No photo leaves the phone; no backend/BA work; no network dependency. |
-| Photo capture | System camera app via `Intent(MediaStore.ACTION_IMAGE_CAPTURE`) + `FileProvider` | No `CAMERA` permission, no CameraX lifecycle code, no Play Store declaration needed. |
+| Photo capture | In-app CameraX preview with `CAMERA` permission | Matches the Cronometer-style flow: bottom sheet → camera permission → live preview with capture button. |
+| Gallery import | Yes | Users can pick an existing label photo from the gallery. Uses read-media permission, not camera. |
 | Serving-size handling | Trust the label; if grams are absent, allow the meal entry but do not offer "Add to my food database" | The food database stores nutrients **per 100g**; silently guessing a gram weight corrupts reusable entries. |
 | Nutrients scanned | Calories, Protein, Carbs, Fat only | Keep the existing lung-function-focused macro labels already used in Tracking and reports. |
 | Front-label photo | Optional | The front label only supplies the product name; the feature works with the nutrition panel alone. |
+| Entry points | Bottom-sheet menu on Tracking add action + "Scan label" button inside `AddFoodDialog` | Reaches users whether they tap the main "+" or are already adding food manually. |
 
 ## Out of scope (for this phase)
 
@@ -26,11 +28,12 @@ Three layers, each isolated behind a small interface:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ UI: ScanLabelDialog + LabelReviewDialog                      │
-│   - Launch camera intents (front label optional, nutrition   │
-│     panel required)                                          │
-│   - Show parsed values as editable fields                    │
-│   - Return a FoodEntry on save                               │
+│ UI: AddFoodBottomSheet + ScanLabelActivity +                 │
+│     LabelReviewActivity                                      │
+│   - Bottom sheet chooses Add Food / Scan Food / Gallery      │
+│   - CameraX preview captures front label (optional) and      │
+│     nutrition label (required)                               │
+│   - Review screen shows editable parsed values               │
 ├─────────────────────────────────────────────────────────────┤
 │ Domain: NutritionLabelParser                                 │
 │   - Pure Kotlin, zero Android imports                        │
@@ -113,26 +116,34 @@ Parsing strategy:
    - `MEDIUM`: value found but on a noisy or merged line, or the keyword is a near match.
    - `LOW`: number found without a unit, or in a two-column panel where the column selection is uncertain.
 
-### 3. `ScanLabelDialog`
+### 3. `AddFoodBottomSheet`
 
-A full-screen dialog (or fragment) that guides the user:
+A `BottomSheetDialogFragment` launched from the Tracking screen's add action and from `AddFoodDialog`:
 
-1. **Instruction step**
-   - Title: "Scan food label"
-   - Body: "Take a clear photo of the Nutrition Facts panel. You can also photograph the front of the package to capture the product name."
-   - Buttons: "Scan nutrition label" (required), "Scan front label" (optional), "Cancel".
-2. **Camera launch**
-   - Use `ActivityResultContracts.TakePicture()` with a `FileProvider` URI.
-   - Front label: stores the resulting URI for product-name extraction.
-   - Nutrition label: proceeds to OCR.
-3. **OCR step**
-   - Show indeterminate progress with text "Reading label…"
-   - Run `MlKitLabelOcr.recognize()` and then `NutritionLabelParser.parse()`.
+- Grid of options: **Add Food**, **Scan Food**, **Photo Library**, **Add Exercise**, etc.
+- Tapping **Scan Food** requests `CAMERA` permission, then launches `ScanLabelActivity`.
+- Tapping **Photo Library** requests the appropriate read-media permission for the Android version, then launches the photo picker and sends the selected URI to `LabelReviewActivity`.
+
+### 4. `ScanLabelActivity`
+
+A full-screen `AppCompatActivity` built on CameraX:
+
+1. **Permission check**
+   - If `CAMERA` permission is not granted, request it via `ActivityResultContracts.RequestPermission()`.
+   - If denied permanently, show a message with a link to app settings.
+2. **Preview**
+   - `PreviewView` with a centered rectangle overlay indicating where to position the label.
+   - Toggle flash button and zoom pinch gesture.
+   - Instructional caption that switches between "Photo front of package (optional)" and "Photo Nutrition Facts panel".
+3. **Capture**
+   - `ImageCapture.takePicture()` writes the JPEG to the app's private `cacheDir`.
+   - Front label is captured first and stored; then the view prompts for the nutrition label.
+   - After the nutrition label is captured, run OCR + parser and launch `LabelReviewActivity`.
 4. **Navigation**
-   - On success, open `LabelReviewDialog`.
-   - On failure (no text, no nutrients found), show a retry message: "We couldn't read this label. Try again with better lighting and the label filling the frame."
+   - Back button returns to the previous step or cancels.
+   - On parsing failure, show a retry overlay instead of leaving the activity.
 
-### 4. `LabelReviewDialog`
+### 5. `LabelReviewActivity`
 
 Displays the parsed values as editable fields:
 
@@ -150,12 +161,17 @@ Actions:
 
 - **"Add to today's log"** — returns a `FoodEntry` scaled by the entered serving amount (default 1 serving).
 - **"Save to my foods"** — enabled only when a gram weight is present; creates a `UserAddedFood` entry scaled to per-100g, then returns the meal entry.
-- **"Retake"** — goes back to `ScanLabelDialog`.
+- **"Retake"** — goes back to `ScanLabelActivity`.
 - **"Cancel"** — discards.
 
-### 5. Integration with `AddFoodDialog`
+### 6. Integration with `AddFoodDialog` and Tracking
 
-Add a new button in `dialog_add_food.xml` next to the manual-entry toggle: **"Scan label"**. Tapping it launches `ScanLabelDialog` from `AddFoodDialog`. When the review dialog returns:
+Two entry points:
+
+1. **Tracking screen:** the existing add action launches `AddFoodBottomSheet` instead of opening `AddFoodDialog` directly. The sheet offers **Add Food** and **Scan Food** (and optionally other actions already on the screen).
+2. **Inside `AddFoodDialog`:** add a small camera icon next to the manual-entry toggle that launches the bottom sheet filtered to food actions, or directly launches `ScanLabelActivity`.
+
+When `LabelReviewActivity` finishes:
 
 - If the user chose **"Add to today's log"**, pre-populate the manual section in `AddFoodDialog` with the scanned macros and product name. The user can still edit before pressing Save.
 - If the user also chose **"Save to my foods"**, call the existing `insertUserAddedFood` callback so the food becomes searchable.
@@ -165,33 +181,49 @@ This reuses all existing save/validate paths in `AddFoodDialog`; no new persiste
 ## Data flow
 
 ```
-User taps "Scan label" in AddFoodDialog
+User taps "+" on Tracking or camera icon in AddFoodDialog
         │
         ▼
-ScanLabelDialog (instruction)
+AddFoodBottomSheet
         │
-        ▼
-System camera → front label photo (optional)
-        │
-        ▼
-System camera → nutrition label photo (required)
-        │
-        ▼
-MlKitLabelOcr.recognize(uri) → raw text
-        │
-        ▼
-NutritionLabelParser.parse(text) → ParsedLabel
-        │
-        ▼
-LabelReviewDialog (editable fields, LOW confidence highlighted)
-        │
-        ├─ Retake ───────────────────────┐
-        │                                  │
-        ▼                                  │
-AddFoodDialog manual section ◄───────────┘
-        │
-        ▼
-Existing Save path → FoodEntry
+        ├─ Add Food ───────┐
+        │                   ▼
+        │            AddFoodDialog (existing)
+        │                   │
+        ├─ Scan Food ──────┤
+        │                   ▼
+        │            ScanLabelActivity (CameraX)
+        │                   │
+        │            front label photo (optional)
+        │                   │
+        │            nutrition label photo (required)
+        │                   │
+        │            MlKitLabelOcr.recognize(uri) → raw text
+        │                   │
+        │            NutritionLabelParser.parse(text) → ParsedLabel
+        │                   │
+        │                   ▼
+        │            LabelReviewActivity (editable fields, LOW highlighted)
+        │                   │
+        └─ Photo Library ───┤
+                            │
+                            ▼
+                    Gallery photo picker URI
+                            │
+                            ▼
+                    MlKitLabelOcr.recognize(uri) → raw text
+                            │
+                            ▼
+                    NutritionLabelParser.parse(text) → ParsedLabel
+                            │
+                            ▼
+                    LabelReviewActivity
+                            │
+                            ▼
+                    AddFoodDialog manual section
+                            │
+                            ▼
+                    Existing Save path → FoodEntry
 ```
 
 ## Error handling
@@ -204,11 +236,14 @@ Existing Save path → FoodEntry
 | Serving size found but no gram weight | Disable "Save to my foods"; meal entry still works |
 | Low-confidence macro | Highlight field in amber; user must review before save |
 | OCR throws (ML Kit error) | Toast: "Could not read label. Please try again." |
+| Camera permission denied | Show rationale; if permanently denied, link to Settings |
+| Read-media permission denied | Disable Photo Library option or link to Settings |
 
 ## Security / HIPAA
 
 - No image or OCR text is uploaded. ML Kit bundled text recognition runs entirely on-device.
-- The captured photos are written to the app's private `cacheDir` via `FileProvider`; delete them after OCR completes or when the dialog is dismissed, whichever comes last.
+- The captured photos are written to the app's private `cacheDir`; delete them after OCR completes or when the activity is finished, whichever comes last.
+- Gallery imports are read-only; no copy is retained beyond the cache used for OCR.
 - Because no PHI leaves the device for this feature, no BAA amendment is needed.
 
 ## Dependencies
@@ -216,12 +251,33 @@ Existing Save path → FoodEntry
 Add to `app/build.gradle`:
 
 ```groovy
+// CameraX
+implementation 'androidx.camera:camera-core:1.3.1'
+implementation 'androidx.camera:camera-camera2:1.3.1'
+implementation 'androidx.camera:camera-lifecycle:1.3.1'
+implementation 'androidx.camera:camera-view:1.3.1'
+
+// ML Kit text recognition
 implementation 'com.google.mlkit:text-recognition:16.0.1'
 ```
 
-APK impact: ~4 MB. This is acceptable relative to the existing 24.2 MB `assets/food_database.json`.
+APK impact: ~5–6 MB total. This is acceptable relative to the existing 24.2 MB `assets/food_database.json`.
 
-No `CAMERA` permission is added.
+## Permissions
+
+Add to `app/src/main/AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-feature android:name="android.hardware.camera" android:required="false" />
+
+<!-- Runtime permissions depend on Android version -->
+<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+    android:maxSdkVersion="32" />
+```
+
+A Play Store declaration will be required for the `CAMERA` permission because this app did not previously request it.
 
 ## File changes
 
@@ -231,19 +287,24 @@ No `CAMERA` permission is added.
 - `app/src/main/java/com/copdhealthtracker/labelscan/MlKitLabelOcr.kt`
 - `app/src/main/java/com/copdhealthtracker/labelscan/NutritionLabelParser.kt`
 - `app/src/main/java/com/copdhealthtracker/labelscan/ParsedLabel.kt`
-- `app/src/main/java/com/copdhealthtracker/ui/dialogs/ScanLabelDialog.kt`
-- `app/src/main/java/com/copdhealthtracker/ui/dialogs/LabelReviewDialog.kt`
-- `app/src/main/res/layout/dialog_scan_label.xml`
-- `app/src/main/res/layout/dialog_label_review.xml`
-- `app/src/main/res/xml/file_paths.xml`
+- `app/src/main/java/com/copdhealthtracker/ui/bottomsheets/AddFoodBottomSheet.kt`
+- `app/src/main/java/com/copdhealthtracker/ui/scan/ScanLabelActivity.kt`
+- `app/src/main/java/com/copdhealthtracker/ui/scan/LabelReviewActivity.kt`
+- `app/src/main/java/com/copdhealthtracker/ui/scan/LabelCaptureViewModel.kt`
+- `app/src/main/res/layout/activity_scan_label.xml`
+- `app/src/main/res/layout/activity_label_review.xml`
+- `app/src/main/res/layout/bottom_sheet_add_food.xml`
+- `app/src/main/res/drawable/ic_scan_food.xml`
+- `app/src/main/res/drawable/ic_photo_library.xml`
 - `app/src/test/java/com/copdhealthtracker/labelscan/NutritionLabelParserTest.kt`
 
 ### Modified files
 
-- `app/build.gradle` — add ML Kit dependency, ensure `testImplementation` already present.
-- `app/src/main/AndroidManifest.xml` — add `FileProvider`.
-- `app/src/main/java/com/copdhealthtracker/ui/dialogs/AddFoodDialog.kt` — add "Scan label" entry point and result handler.
-- `app/src/main/res/layout/dialog_add_food.xml` — add "Scan label" button.
+- `app/build.gradle` — add CameraX and ML Kit dependencies, ensure `testImplementation` already present.
+- `app/src/main/AndroidManifest.xml` — add `CAMERA` permission, storage permissions, and register `ScanLabelActivity` / `LabelReviewActivity`.
+- `app/src/main/java/com/copdhealthtracker/ui/fragments/TrackingFragment.kt` — launch `AddFoodBottomSheet` from the add-food action.
+- `app/src/main/java/com/copdhealthtracker/ui/dialogs/AddFoodDialog.kt` — add camera/gallery entry point and result handler.
+- `app/src/main/res/layout/dialog_add_food.xml` — add scan icon/button.
 - `app/src/main/res/values/strings.xml` — add scan-related strings.
 
 ## Testing
