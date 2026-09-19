@@ -3,10 +3,54 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <View
+        android:id="@+id/overlay"
+        android:layout_width="280dp"
+        android:layout_height="360dp"
+        android:layout_gravity="center"
+        android:background="@drawable/scan_overlay_border" />
+
     <TextView
+        android:id="@+id/instructionText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:text="Scan Label"
-        android:textAppearance="?attr/textAppearanceHeadline5" />
+        android:layout_gravity="center|top"
+        android:layout_marginTop="64dp"
+        android:text="@string/scan_front_label_instruction"
+        android:textColor="@android:color/white"
+        android:textSize="18sp"
+        android:shadowColor="@android:color/black"
+        android:shadowDx="1"
+        android:shadowDy="1"
+        android:shadowRadius="2" />
+
+    <Button
+        android:id="@+id/skipFrontButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="120dp"
+        android:text="@string/skip_front_label" />
+
+    <Button
+        android:id="@+id/switchToLabelButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="120dp"
+        android:text="@string/scan_label_instead"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/captureButton"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="32dp"
+        android:background="@drawable/capture_button_circle" />
 </FrameLayout>

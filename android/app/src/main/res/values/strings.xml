@@ -58,4 +58,21 @@
   <string name="review_scanned_label">Review Scanned Label</string>
   <string name="add_to_log">Add to Log</string>
   <string name="save_to_my_foods">Save to My Foods</string>
+  <string name="scan_front_label_instruction">Photo front of package (optional)</string>
+  <string name="scan_nutrition_label_instruction">Photo Nutrition Facts panel</string>
+  <string name="scan_qr_code_instruction">Point camera at product QR code</string>
+  <string name="scan_label_instead">Scan nutrition label instead</string>
+  <string name="reading_label">Reading label…</string>
+  <string name="skip_front_label">Skip</string>
+  <string name="food_name">Food name</string>
+  <string name="grams_per_serving">Grams per serving</string>
+  <string name="calories">Calories</string>
+  <string name="protein">Protein (g)</string>
+  <string name="carbs">Carbs (g)</string>
+  <string name="fat">Fat (g)</string>
+  <string name="check_this_value">Please check this value.</string>
+  <string name="add_to_todays_log">Add to today\'s log</string>
+  <string name="retake">Retake</string>
+  <string name="cancel">Cancel</string>
+  <string name="serving_size_label">Serving size: %1$s</string>
 </resources>

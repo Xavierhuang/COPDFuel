@@ -23,6 +23,7 @@ import com.copdhealthtracker.R
 import com.copdhealthtracker.data.model.FavoriteFood
 import com.copdhealthtracker.data.model.FavoriteMeal
 import com.copdhealthtracker.data.model.FoodEntry
+import com.copdhealthtracker.data.model.UserAddedFood
 import com.copdhealthtracker.data.model.WaterEntry
 import com.copdhealthtracker.databinding.FragmentTrackingBinding
 import com.copdhealthtracker.ui.bottomsheets.AddFoodBottomSheet
@@ -79,7 +80,13 @@ class TrackingFragment : Fragment() {
     ) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             val food = result.data?.getParcelableExtra<FoodEntry>(LabelReviewActivity.EXTRA_FOOD_ENTRY)
-            food?.let { viewModel.insertFood(it) }
+            val saveToDatabase = result.data?.getBooleanExtra(LabelReviewActivity.EXTRA_SAVE_TO_DATABASE, false) ?: false
+            food?.let {
+                viewModel.insertFood(it)
+                if (saveToDatabase) {
+                    saveScannedFoodToDatabase(it)
+                }
+            }
         }
     }
 
@@ -90,6 +97,7 @@ class TrackingFragment : Fragment() {
             val uri = result.data?.data ?: return@registerForActivityResult
             val intent = Intent(requireContext(), LabelReviewActivity::class.java).apply {
                 putExtra(LabelReviewActivity.EXTRA_NUTRITION_LABEL_URI, uri.toString())
+                putExtra(LabelReviewActivity.EXTRA_DATE, selectedDateMillis)
             }
             scanLauncher.launch(intent)
         }
@@ -1939,6 +1947,7 @@ class TrackingFragment : Fragment() {
     private fun launchScanLabel() {
         val intent = Intent(requireContext(), ScanLabelActivity::class.java).apply {
             putExtra(ScanLabelActivity.EXTRA_SCAN_MODE, ScanLabelActivity.SCAN_MODE_LABEL)
+            putExtra(ScanLabelActivity.EXTRA_DATE, selectedDateMillis)
         }
         scanLauncher.launch(intent)
     }
@@ -1946,6 +1955,7 @@ class TrackingFragment : Fragment() {
     private fun launchScanQrCode() {
         val intent = Intent(requireContext(), ScanLabelActivity::class.java).apply {
             putExtra(ScanLabelActivity.EXTRA_SCAN_MODE, ScanLabelActivity.SCAN_MODE_QR)
+            putExtra(ScanLabelActivity.EXTRA_DATE, selectedDateMillis)
         }
         scanLauncher.launch(intent)
     }
@@ -1953,6 +1963,26 @@ class TrackingFragment : Fragment() {
     private fun launchPhotoLibrary() {
         val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
         photoLibraryLauncher.launch(intent)
+    }
+
+    private fun saveScannedFoodToDatabase(entry: FoodEntry) {
+        val grams = entry.quantity.extractGrams() ?: return
+        val factor = grams / 100.0
+        if (factor <= 0) return
+        val userFood = UserAddedFood(
+            name = entry.name,
+            calories = entry.calories / factor,
+            protein = entry.protein / factor,
+            carbs = entry.carbs / factor,
+            fat = entry.fat / factor
+        )
+        lifecycleScope.launch {
+            viewModel.insertUserAddedFood(userFood)
+        }
+    }
+
+    private fun String.extractGrams(): Double? {
+        return Regex("\\((\\d+(?:\\.\\d+)?)g\\)").find(this)?.groupValues?.get(1)?.toDoubleOrNull()
     }
 
     private fun showFavoritesDialog() {
