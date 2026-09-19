@@ -518,7 +518,7 @@ export default function App() {
     setDailyExercises(prev => [...prev, exercise]);
     
     Alert.alert(
-      '🏃‍♂️ Exercise Logged!',
+      'Exercise logged',
       `${exerciseType} for ${minutes} minutes has been recorded for ${formatDisplayDate(currentDate)}`
     );
     
@@ -533,8 +533,8 @@ export default function App() {
   const importFromPhoneHealth = async () => {
     try {
       Alert.alert(
-        '📱 Import Health Data',
-        'Choose data source:',
+        'Import health data',
+        'Choose a source:',
         [
           {
             text: 'Cancel',
@@ -563,8 +563,8 @@ export default function App() {
   const importAppleHealthData = async () => {
     // Simulate Apple Health data import
     Alert.alert(
-      '🍎 Apple Health Integration',
-      'This would connect to Apple HealthKit to import:\n\n• Steps taken today\n• Workout sessions\n• Active minutes\n• Heart rate data\n\nFor now, here are some sample readings:',
+      'Apple Health (HealthKit) import',
+      'If you connect Apple Health, COPD Fuel can read the following data types (with your permission) to help populate your tracking views:\n\n• Steps\n• Workouts / active minutes\n• Heart rate\n\nFor now, here are some sample readings:',
       [
         {
           text: 'Import Walking (45 min)',
@@ -601,7 +601,7 @@ export default function App() {
   const importGoogleFitData = async () => {
     // Simulate Google Fit data import
     Alert.alert(
-      '🏃‍♂️ Google Fit Integration',
+      'Google Fit import',
       'This would connect to Google Fit to import:\n\n• Daily step count\n• Workout activities\n• Active minutes\n• Calories burned\n\nFor now, here are some sample readings:',
       [
         {
