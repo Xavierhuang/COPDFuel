@@ -4,7 +4,7 @@
 
 **Goal:** Let users scan packaged-food labels with the in-app camera or gallery, scan product QR codes for GTIN-based lookup, and pre-fill the existing dietary entry form with calories, protein, carbs, and fat.
 
-**Architecture:** A pure-Kotlin `NutritionLabelParser` sits behind a `LabelOcr` interface powered by on-device ML Kit. Camera capture uses CameraX. A `BottomSheetDialogFragment` offers Add Food / Scan Food / Scan QR Code / Photo Library, launching either the existing `AddFoodDialog` or a new `ScanLabelActivity` → `LabelReviewActivity` flow. QR codes are decoded on-device, their GTIN is looked up against USDA FoodData Central, and parsed values are returned to `AddFoodDialog` as editable manual-entry values.
+**Architecture:** A pure-Kotlin `NutritionLabelParser` sits behind a `LabelOcr` interface powered by on-device ML Kit. Camera capture uses CameraX. A `BottomSheetDialogFragment` offers Add Food / Scan Label / Scan QR Code / Photo Library, launching either the existing `AddFoodDialog` or a new `ScanLabelActivity` → `LabelReviewActivity` flow. QR codes are decoded on-device, their GTIN is looked up against USDA FoodData Central, and parsed values are returned to `AddFoodDialog` as editable manual-entry values.
 
 **Tech Stack:** Android Kotlin, CameraX, ML Kit Text Recognition v2, ML Kit Barcode Scanning, Room (existing), JUnit 4 (existing).
 
@@ -30,14 +30,14 @@
 | `labelscan/MlKitBarcodeScanner.kt` | ML Kit QR/barcode scanning implementation |
 | `labelscan/UsdaGtinLookup.kt` | Query USDA FDC by GTIN/UPC |
 | `labelscan/NutritionLabelParser.kt` | Pure Kotlin parser for Nutrition Facts text |
-| `ui/bottomsheets/AddFoodBottomSheet.kt` | Bottom sheet: Add Food / Scan Food / Photo Library |
+| `ui/bottomsheets/AddFoodBottomSheet.kt` | Bottom sheet: Add Food / Scan Label / Photo Library |
 | `ui/scan/ScanLabelActivity.kt` | CameraX preview + capture front and nutrition labels |
 | `ui/scan/LabelReviewActivity.kt` | Editable review of parsed values |
 | `ui/scan/LabelCaptureViewModel.kt` | Holds captured URIs and parsed result across steps |
 | `res/layout/bottom_sheet_add_food.xml` | Bottom sheet grid layout |
 | `res/layout/activity_scan_label.xml` | Camera preview + overlay + controls |
 | `res/layout/activity_label_review.xml` | Editable form for scanned values |
-| `res/drawable/ic_scan_food.xml`, `ic_photo_library.xml` | Bottom sheet icons |
+| `res/drawable/ic_scan_label.xml`, `ic_photo_library.xml` | Bottom sheet icons |
 | `res/values/strings.xml` | New copy |
 | `app/build.gradle` | CameraX + ML Kit dependencies |
 | `AndroidManifest.xml` | Permissions + activity declarations |
@@ -556,7 +556,7 @@ git commit -m "test(labelscan): add NutritionLabelParser unit tests"
 **Files:**
 - Create: `app/src/main/java/com/copdhealthtracker/ui/bottomsheets/AddFoodBottomSheet.kt`
 - Create: `app/src/main/res/layout/bottom_sheet_add_food.xml`
-- Create: `app/src/main/res/drawable/ic_scan_food.xml`
+- Create: `app/src/main/res/drawable/ic_scan_label.xml`
 - Create: `app/src/main/res/drawable/ic_photo_library.xml`
 - Modify: `app/src/main/res/values/strings.xml`
 
@@ -673,13 +673,13 @@ Use a `GridLayout` or `LinearLayout` with three options. Example:
             <ImageView
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:src="@drawable/ic_scan_food"
-                android:contentDescription="@string/scan_food" />
+                android:src="@drawable/ic_scan_label"
+                android:contentDescription="@string/scan_label" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/scan_food"
+                android:text="@string/scan_label"
                 android:layout_marginTop="8dp" />
         </LinearLayout>
 
@@ -739,14 +739,14 @@ In `app/src/main/res/values/strings.xml`:
 ```xml
     <string name="add_food_title">Add Food</string>
     <string name="add_food">Add Food</string>
-    <string name="scan_food">Scan Food</string>
+    <string name="scan_label">Scan Label</string>
     <string name="scan_qr_code">Scan QR Code</string>
     <string name="photo_library">Photo Library</string>
 ```
 
 - [ ] **Step 4: Create vector drawables**
 
-`ic_scan_food.xml`:
+`ic_scan_label.xml`:
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -791,11 +791,11 @@ Expected: Build succeeds.
 ```bash
 git add app/src/main/java/com/copdhealthtracker/ui/bottomsheets/AddFoodBottomSheet.kt \
         app/src/main/res/layout/bottom_sheet_add_food.xml \
-        app/src/main/res/drawable/ic_scan_food.xml \
+        app/src/main/res/drawable/ic_scan_label.xml \
         app/src/main/res/drawable/ic_scan_qr_code.xml \
         app/src/main/res/drawable/ic_photo_library.xml \
         app/src/main/res/values/strings.xml
-git commit -m "feat: add AddFoodBottomSheet with Add Food, Scan Food, Scan QR Code, Photo Library options"
+git commit -m "feat: add AddFoodBottomSheet with Add Food, Scan Label, Scan QR Code, Photo Library options"
 ```
 
 ---
@@ -1719,8 +1719,8 @@ In `dialog_add_food.xml`, add an `ImageButton` next to the manual-entry toggle. 
             android:id="@+id/scanLabelButton"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:src="@drawable/ic_scan_food"
-            android:contentDescription="@string/scan_food"
+            android:src="@drawable/ic_scan_label"
+            android:contentDescription="@string/scan_label"
             android:background="?attr/selectableItemBackgroundBorderless" />
     </LinearLayout>
 ```
@@ -1883,8 +1883,8 @@ Expected: All tests pass.
 On a physical device or emulator:
 
 1. Open Tracking → tap "+ Quick Add Food".
-2. Bottom sheet appears with Add Food, Scan Food, Scan QR Code, Photo Library.
-3. Tap Scan Food → grant camera permission.
+2. Bottom sheet appears with Add Food, Scan Label, Scan QR Code, Photo Library.
+3. Tap Scan Label → grant camera permission.
 4. Capture front label (optional), then nutrition label.
 5. Review screen opens with calories, protein, carbs, fat pre-filled.
 6. Edit a value and tap Add to today's log.

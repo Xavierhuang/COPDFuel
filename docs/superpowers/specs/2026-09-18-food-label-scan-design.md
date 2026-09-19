@@ -32,7 +32,7 @@ Three layers, each isolated behind a small interface:
 ┌─────────────────────────────────────────────────────────────┐
 │ UI: AddFoodBottomSheet + ScanLabelActivity +                 │
 │     LabelReviewActivity                                      │
-│   - Bottom sheet chooses Add Food / Scan Food /              │
+│   - Bottom sheet chooses Add Food / Scan Label /              │
 │     Scan QR Code / Photo Library                             │
 │   - CameraX preview captures QR codes, front label, and      │
 │     nutrition label                                          │
@@ -146,8 +146,8 @@ QR-code path:
 
 A `BottomSheetDialogFragment` launched from the Tracking screen's add action and from `AddFoodDialog`:
 
-- Grid of options: **Add Food**, **Scan Food**, **Scan QR Code**, **Photo Library**, **Add Exercise**, etc.
-- Tapping **Scan Food** requests `CAMERA` permission, then launches `ScanLabelActivity` in label-photo mode.
+- Grid of options: **Add Food**, **Scan Label**, **Scan QR Code**, **Photo Library**, **Add Exercise**, etc.
+- Tapping **Scan Label** requests `CAMERA` permission, then launches `ScanLabelActivity` in label-photo mode.
 - Tapping **Scan QR Code** requests `CAMERA` permission, then launches `ScanLabelActivity` in QR-scanning mode.
 - Tapping **Photo Library** requests the appropriate read-media permission for the Android version, then launches the photo picker. The selected image is first checked for a QR code; if none is found, it is treated as a nutrition-label photo and sent to `LabelReviewActivity`.
 
@@ -204,7 +204,7 @@ Actions:
 
 Two entry points:
 
-1. **Tracking screen:** the existing add action launches `AddFoodBottomSheet` instead of opening `AddFoodDialog` directly. The sheet offers **Add Food** and **Scan Food** (and optionally other actions already on the screen).
+1. **Tracking screen:** the existing add action launches `AddFoodBottomSheet` instead of opening `AddFoodDialog` directly. The sheet offers **Add Food** and **Scan Label** (and optionally other actions already on the screen).
 2. **Inside `AddFoodDialog`:** add a small camera icon next to the manual-entry toggle that launches the bottom sheet filtered to food actions, or directly launches `ScanLabelActivity`.
 
 When `LabelReviewActivity` finishes:
@@ -226,7 +226,7 @@ AddFoodBottomSheet
         │                           ▼
         │                    AddFoodDialog (existing)
         │                           │
-        ├─ Scan Food ──────────────┤
+        ├─ Scan Label ──────────────┤
         │                           ▼
         │                    ScanLabelActivity (CameraX, label mode)
         │                           │
@@ -353,7 +353,7 @@ A Play Store declaration will be required for the `CAMERA` permission because th
 - `app/src/main/res/layout/activity_scan_label.xml`
 - `app/src/main/res/layout/activity_label_review.xml`
 - `app/src/main/res/layout/bottom_sheet_add_food.xml`
-- `app/src/main/res/drawable/ic_scan_food.xml`
+- `app/src/main/res/drawable/ic_scan_label.xml`
 - `app/src/main/res/drawable/ic_photo_library.xml`
 - `app/src/test/java/com/copdhealthtracker/labelscan/NutritionLabelParserTest.kt`
 
