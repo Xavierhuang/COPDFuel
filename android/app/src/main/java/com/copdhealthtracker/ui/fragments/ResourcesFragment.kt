@@ -23,6 +23,7 @@ import com.copdhealthtracker.R
 import com.copdhealthtracker.data.model.Medication
 import com.copdhealthtracker.databinding.FragmentResourcesBinding
 import com.copdhealthtracker.ui.dialogs.AddMedicationDialog
+import com.copdhealthtracker.ui.resources.MedicationTypes
 import com.copdhealthtracker.utils.AppApplication
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -45,7 +46,7 @@ class ResourcesFragment : Fragment() {
     private val tools = listOf(
         ToolInfo("Severity\nEval", R.drawable.ic_tool_severity),
         ToolInfo("COPD\nExacerb.", R.drawable.ic_tool_exacerbation),
-        ToolInfo("Pulmonary\nRehab", R.drawable.ic_tool_pulmonary),
+        ToolInfo("Pulm.\nRehab", R.drawable.ic_tool_pulmonary),
         ToolInfo("Resp.\nCare", R.drawable.ic_tool_medication),
         ToolInfo("Resource\nHub", R.drawable.ic_tool_resources)
     )
@@ -191,7 +192,7 @@ class ResourcesFragment : Fragment() {
             binding.resourcesContentContainer.addView(row)
         }
 
-        addRow("What is your latest FEV1 percentage? (If known)", fev1Str, fev1Options) { fev1Str = it }
+        addRow("What is your latest FEV1 (Forced Expiratory Volume in one second) percentage? (If known)", fev1Str, fev1Options) { fev1Str = it }
         addRow("How many times have you been hospitalized for COPD in the past year?", hospStr, numberOptions) { hospStr = it }
         addRow("How many COPD flare-ups (exacerbations) have you had in the past year?", flareStr, numberOptions) { flareStr = it }
         addRow("Do you use supplemental oxygen?", oxygenStr, oxygenOptions) { oxygenStr = it }
@@ -338,6 +339,10 @@ class ResourcesFragment : Fragment() {
         val doctorPhoneField = addContactField("Doctor's Phone", "doctor_phone", "(555) 123-4567")
         val emergencyNameField = addContactField("Emergency Contact Name", "emergency_contact_name", "Jane Doe")
         val emergencyPhoneField = addContactField("Emergency Contact Phone", "emergency_contact_phone", "(555) 987-6543")
+        val emergency2NameField = addContactField("Second Emergency Contact Name", "emergency_contact2_name", "John Doe")
+        val emergency2PhoneField = addContactField("Second Emergency Contact Phone", "emergency_contact2_phone", "(555) 222-3333")
+        // Provider name only: ID numbers are deliberately not collected.
+        val insuranceField = addContactField("Insurance Provider (name only, no ID numbers)", "insurance_provider", "e.g. Medicare, Humana")
 
         container.addView(Button(ctx).apply {
             text = "Save Contacts"
@@ -353,6 +358,9 @@ class ResourcesFragment : Fragment() {
                     .putString("doctor_phone", doctorPhoneField.text.toString())
                     .putString("emergency_contact_name", emergencyNameField.text.toString())
                     .putString("emergency_contact_phone", emergencyPhoneField.text.toString())
+                    .putString("emergency_contact2_name", emergency2NameField.text.toString())
+                    .putString("emergency_contact2_phone", emergency2PhoneField.text.toString())
+                    .putString("insurance_provider", insuranceField.text.toString())
                     .apply()
                 android.widget.Toast.makeText(ctx, "Contacts saved", android.widget.Toast.LENGTH_SHORT).show()
             }
@@ -1524,7 +1532,6 @@ class ResourcesFragment : Fragment() {
         container.addView(imageView)
     }
 
-    private var expandedMedicationCategory: String? = null
 
     private fun buildMedicationContent() {
         val ctx = requireContext()
@@ -1696,9 +1703,12 @@ class ResourcesFragment : Fragment() {
                 typeCard.addView(cardContent)
                 
                 typeCard.setOnClickListener {
-                    expandedMedicationCategory = if (expandedMedicationCategory == medType.id) null else medType.id
-                    container.removeAllViews()
-                    buildMedicationContent()
+                    val info = MedicationTypes.forId(medType.id) ?: return@setOnClickListener
+                    androidx.appcompat.app.AlertDialog.Builder(ctx)
+                        .setTitle(info.title)
+                        .setMessage(info.message())
+                        .setPositiveButton("Close", null)
+                        .show()
                 }
                 
                 typesRow.addView(typeCard)
@@ -1713,55 +1723,6 @@ class ResourcesFragment : Fragment() {
             }
 
             container.addView(typesRow)
-        }
-
-        // Show expanded content if a category is selected
-        if (expandedMedicationCategory != null) {
-            val expandedContent = getExpandedMedicationContent(expandedMedicationCategory!!)
-            if (expandedContent != null) {
-                val expandedCard = com.google.android.material.card.MaterialCardView(ctx).apply {
-                    radius = 12f * density
-                    cardElevation = 2f * density
-                    setCardBackgroundColor(cardBgColor)
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply { 
-                        topMargin = (16 * density).toInt()
-                        bottomMargin = (16 * density).toInt() 
-                    }
-                }
-
-                val expandedCardContent = LinearLayout(ctx).apply {
-                    orientation = LinearLayout.VERTICAL
-                    setPadding(
-                        (16 * density).toInt(),
-                        (16 * density).toInt(),
-                        (16 * density).toInt(),
-                        (16 * density).toInt()
-                    )
-                }
-
-                expandedCardContent.addView(TextView(ctx).apply {
-                    text = expandedContent.first
-                    textSize = 18f
-                    setTypeface(null, android.graphics.Typeface.BOLD)
-                    setTextColor(primaryDarkColor)
-                    setPadding(0, 0, 0, (8 * density).toInt())
-                })
-
-                expandedContent.second.forEach { item ->
-                    expandedCardContent.addView(TextView(ctx).apply {
-                        text = "  $item"
-                        textSize = 14f
-                        setTextColor(secondaryTextColor)
-                        setPadding(0, (4 * density).toInt(), 0, (4 * density).toInt())
-                    })
-                }
-
-                expandedCard.addView(expandedCardContent)
-                container.addView(expandedCard)
-            }
         }
 
         // Watch Inhaler Technique Videos Button
@@ -1969,69 +1930,6 @@ class ResourcesFragment : Fragment() {
             setTypeface(null, android.graphics.Typeface.ITALIC)
             setPadding(0, 16, 0, 0)
         })
-    }
-
-    private fun getExpandedMedicationContent(id: String): Pair<String, List<String>>? {
-        return when (id) {
-            "bronchodilators" -> Pair("Bronchodilators", listOf(
-                "Short-acting (SABAs): Albuterol, Levalbuterol",
-                "Short-acting (SAMAs): Ipratropium",
-                "Long-acting (LABAs): Salmeterol, Formoterol, Indacaterol",
-                "Long-acting (LAMAs): Tiotropium, Aclidinium, Umeclidinium"
-            ))
-            "ics" -> Pair("Inhaled Corticosteroids", listOf(
-                "Fluticasone",
-                "Budesonide",
-                "Beclomethasone",
-                "Mometasone"
-            ))
-            "combination" -> Pair("Combination Inhalers", listOf(
-                "LABA + LAMA: Anoro Ellipta, Stiolto Respimat",
-                "LABA + ICS: Advair, Symbicort, Breo Ellipta",
-                "Triple Therapy: Trelegy Ellipta, Breztri Aerosphere"
-            ))
-            "pde4" -> Pair("Phosphodiesterase-4 (PDE4) Inhibitors", listOf(
-                "Roflumilast (Daliresp)",
-                "Used for severe COPD with chronic bronchitis",
-                "Helps reduce exacerbations"
-            ))
-            "antibiotics" -> Pair("Antibiotics", listOf(
-                "Azithromycin (Z-pack)",
-                "Amoxicillin-clavulanate (Augmentin)",
-                "Doxycycline",
-                "Levofloxacin"
-            ))
-            "systemic" -> Pair("Systemic Corticosteroids", listOf(
-                "Prednisone",
-                "Methylprednisolone",
-                "Dexamethasone",
-                "Used short-term during exacerbations"
-            ))
-            "methylxanthines" -> Pair("Methylxanthines", listOf(
-                "Theophylline (Theo-24, Elixophyllin)",
-                "Older class of bronchodilators",
-                "Used less frequently due to side effects"
-            ))
-            "mucolytics" -> Pair("Mucolytics/Expectorants", listOf(
-                "N-acetylcysteine (NAC)",
-                "Carbocysteine",
-                "Guaifenesin",
-                "Help thin and loosen mucus"
-            ))
-            "biologics" -> Pair("Biologics Medications for COPD", listOf(
-                "Mepolizumab (Nucala) - for eosinophilic COPD",
-                "Benralizumab (Fasenra)",
-                "Dupilumab (Dupixent)",
-                "Newer targeted therapies"
-            ))
-            "nebulizer" -> Pair("Nebulizer Medications", listOf(
-                "Albuterol nebulizer solution",
-                "Ipratropium nebulizer solution",
-                "Budesonide (Pulmicort Respules)",
-                "Combination: Albuterol + Ipratropium (DuoNeb)"
-            ))
-            else -> null
-        }
     }
 
     private fun buildResourceHubContent() {

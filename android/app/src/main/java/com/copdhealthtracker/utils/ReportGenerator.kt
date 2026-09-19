@@ -158,11 +158,17 @@ class ReportGenerator(
         val doctorPhone = prefs.getString("doctor_phone", "")
         val emergencyName = prefs.getString("emergency_contact_name", "")
         val emergencyPhone = prefs.getString("emergency_contact_phone", "")
+        val emergency2Name = prefs.getString("emergency_contact2_name", "")
+        val emergency2Phone = prefs.getString("emergency_contact2_phone", "")
+        val insuranceProvider = prefs.getString("insurance_provider", "")
         
         sb.appendLine("  Doctor: ${if (doctorName.isNullOrEmpty()) "Not set" else doctorName}")
         sb.appendLine("  Doctor Phone: ${if (doctorPhone.isNullOrEmpty()) "Not set" else doctorPhone}")
         sb.appendLine("  Emergency Contact: ${if (emergencyName.isNullOrEmpty()) "Not set" else emergencyName}")
         sb.appendLine("  Emergency Phone: ${if (emergencyPhone.isNullOrEmpty()) "Not set" else emergencyPhone}")
+        sb.appendLine("  Second Emergency Contact: ${if (emergency2Name.isNullOrEmpty()) "Not set" else emergency2Name}")
+        sb.appendLine("  Second Emergency Phone: ${if (emergency2Phone.isNullOrEmpty()) "Not set" else emergency2Phone}")
+        sb.appendLine("  Insurance Provider: ${if (insuranceProvider.isNullOrEmpty()) "Not set" else insuranceProvider}")
         sb.appendLine()
         
         if (!lastUpdated.isNullOrEmpty()) {
