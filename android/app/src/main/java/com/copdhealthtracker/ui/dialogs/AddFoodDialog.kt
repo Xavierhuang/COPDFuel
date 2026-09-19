@@ -1,7 +1,10 @@
 package com.copdhealthtracker.ui.dialogs
 
 import android.app.Dialog
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import android.text.Editable
 import android.text.TextUtils
 import android.text.TextWatcher
@@ -10,6 +13,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
@@ -21,6 +25,9 @@ import com.copdhealthtracker.data.model.FoodSearchResult
 import com.copdhealthtracker.data.model.UserAddedFood
 import com.copdhealthtracker.databinding.DialogAddFoodBinding
 import com.copdhealthtracker.ui.adapters.FoodSearchAdapter
+import com.copdhealthtracker.ui.bottomsheets.AddFoodBottomSheet
+import com.copdhealthtracker.ui.scan.LabelReviewActivity
+import com.copdhealthtracker.ui.scan.ScanLabelActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,6 +49,27 @@ class AddFoodDialog(
     private lateinit var searchAdapter: FoodSearchAdapter
     private lateinit var foodDatabaseHelper: FoodDatabaseHelper
 
+    private val scanLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val food = result.data?.getParcelableExtra<FoodEntry>(LabelReviewActivity.EXTRA_FOOD_ENTRY)
+            food?.let { prefillFromScan(it) }
+        }
+    }
+
+    private val photoLibraryLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val uri = result.data?.data ?: return@registerForActivityResult
+            val intent = Intent(requireContext(), LabelReviewActivity::class.java).apply {
+                putExtra(LabelReviewActivity.EXTRA_NUTRITION_LABEL_URI, uri.toString())
+            }
+            scanLauncher.launch(intent)
+        }
+    }
+    
     private val usdaApiKey: String
         get() = com.copdhealthtracker.BuildConfig.USDA_FDC_API_KEY
 
@@ -183,6 +211,17 @@ class AddFoodDialog(
                 binding.manualEntrySection.visibility = View.GONE
                 binding.toggleManualButton.text = "Edit Nutrition Manually"
             }
+        }
+
+        binding.scanLabelButton.setOnClickListener {
+            AddFoodBottomSheet { action ->
+                when (action) {
+                    AddFoodBottomSheet.Action.ADD_FOOD -> { /* already in AddFoodDialog */ }
+                    AddFoodBottomSheet.Action.SCAN_LABEL -> launchScanLabel()
+                    AddFoodBottomSheet.Action.SCAN_QR_CODE -> launchScanQrCode()
+                    AddFoodBottomSheet.Action.PHOTO_LIBRARY -> launchPhotoLibrary()
+                }
+            }.show(parentFragmentManager, "AddFoodBottomSheet")
         }
 
         setupDefaultServingSize()
@@ -752,6 +791,35 @@ class AddFoodDialog(
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+    
+    private fun launchScanLabel() {
+        val intent = Intent(requireContext(), ScanLabelActivity::class.java).apply {
+            putExtra(ScanLabelActivity.EXTRA_SCAN_MODE, ScanLabelActivity.SCAN_MODE_LABEL)
+        }
+        scanLauncher.launch(intent)
+    }
+
+    private fun launchScanQrCode() {
+        val intent = Intent(requireContext(), ScanLabelActivity::class.java).apply {
+            putExtra(ScanLabelActivity.EXTRA_SCAN_MODE, ScanLabelActivity.SCAN_MODE_QR)
+        }
+        scanLauncher.launch(intent)
+    }
+
+    private fun launchPhotoLibrary() {
+        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+        photoLibraryLauncher.launch(intent)
+    }
+
+    private fun prefillFromScan(entry: FoodEntry) {
+        binding.foodNameEdit.setText(entry.name)
+        binding.manualEntrySection.visibility = View.VISIBLE
+        binding.toggleManualButton.text = "Hide Manual Entry"
+        binding.caloriesEdit.setText(entry.calories.toInt().toString())
+        binding.proteinEdit.setText(String.format("%.1f", entry.protein))
+        binding.carbsEdit.setText(String.format("%.1f", entry.carbs))
+        binding.fatEdit.setText(String.format("%.1f", entry.fat))
     }
 
     override fun onDestroyView() {
