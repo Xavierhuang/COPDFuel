@@ -33,8 +33,8 @@ android {
         applicationId "com.copdhealthtracker"
         minSdk 26
         targetSdk 36
-        versionCode 9
-        versionName "1.0.7"
+        versionCode 10
+        versionName "1.0.8"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "String", "API_BASE_URL", "\"https://d2gfwfsr2a.execute-api.us-east-2.amazonaws.com\""
@@ -115,7 +115,11 @@ dependencies {
     // billing-ktx is intentionally omitted: we use the callback API, not its suspend
     // extensions, and it drags in Kotlin 2.x metadata this project's compiler can't read.
     implementation 'com.android.billingclient:billing:9.1.0'
-    
+
+    // Google Play In-App Review (native rating prompt). review-ktx omitted for the
+    // same reason as billing-ktx; we use the callback API.
+    implementation 'com.google.android.play:review:2.0.2'
+
     // Cognito User Pools (auth)
     implementation 'com.amazonaws:aws-android-sdk-auth-userpools:2.81.1'
     

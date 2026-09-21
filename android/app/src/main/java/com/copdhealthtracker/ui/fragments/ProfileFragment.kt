@@ -68,6 +68,7 @@ class ProfileFragment : Fragment() {
         setupSignOut()
         setupDeleteAccount()
         setupPrivacyPolicy()
+        setupRateApp()
         updateHipaaStatus()
     }
 
@@ -104,6 +105,21 @@ class ProfileFragment : Fragment() {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
             } else {
                 Toast.makeText(requireContext(), "Privacy policy link will be added when available.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    /**
+     * A tap must always do something, and Play's in-app review prompt may
+     * silently not appear — so this row opens the store listing instead.
+     */
+    private fun setupRateApp() {
+        binding.profileRateItem.setOnClickListener {
+            val packageName = requireContext().packageName
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName")))
+            } catch (e: android.content.ActivityNotFoundException) {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName")))
             }
         }
     }

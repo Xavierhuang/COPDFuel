@@ -26,6 +26,7 @@ import com.copdhealthtracker.data.model.FoodEntry
 import com.copdhealthtracker.data.model.UserAddedFood
 import com.copdhealthtracker.data.model.WaterEntry
 import com.copdhealthtracker.databinding.FragmentTrackingBinding
+import com.copdhealthtracker.review.ReviewPrompter
 import com.copdhealthtracker.ui.bottomsheets.AddFoodBottomSheet
 import com.copdhealthtracker.ui.dialogs.*
 import com.copdhealthtracker.ui.scan.LabelReviewActivity
@@ -83,6 +84,7 @@ class TrackingFragment : Fragment() {
             val saveToDatabase = result.data?.getBooleanExtra(LabelReviewActivity.EXTRA_SAVE_TO_DATABASE, false) ?: false
             food?.let {
                 viewModel.insertFood(it)
+                onLogSaved()
                 if (saveToDatabase) {
                     saveScannedFoodToDatabase(it)
                 }
@@ -1942,7 +1944,10 @@ class TrackingFragment : Fragment() {
 
     private fun showAddFoodDialog() {
         val dialog = AddFoodDialog(
-            onSave = { viewModel.insertFood(it) },
+            onSave = {
+                viewModel.insertFood(it)
+                onLogSaved()
+            },
             dateForEntry = selectedDateMillis,
             onSaveFavorite = { viewModel.insertFavoriteFood(it) },
             getAllUserAddedFoods = { viewModel.getAllUserAddedFoods() },
@@ -2133,6 +2138,7 @@ class TrackingFragment : Fragment() {
     private fun showExerciseDialog() {
         val dialog = AddExerciseDialog { exerciseEntry ->
             viewModel.insertExercise(exerciseEntry)
+            onLogSaved()
         }
         dialog.show(parentFragmentManager, "AddExerciseDialog")
     }
@@ -2254,14 +2260,21 @@ class TrackingFragment : Fragment() {
             if (!weightEntry.isGoal) {
                 ProfileWeightSync.writeWeightToPrefs(requireContext(), weightEntry.weight)
             }
+            onLogSaved()
         }
         dialog.show(parentFragmentManager, "AddWeightDialog")
     }
-    
+
     private fun addWater(amountOz: Int) {
         val entry = WaterEntry(amount = amountOz)
         viewModel.insertWaterEntry(entry)
         android.widget.Toast.makeText(requireContext(), "+$amountOz oz added", android.widget.Toast.LENGTH_SHORT).show()
+        onLogSaved()
+    }
+
+    /** A Tracking entry was saved; Google Play may be asked for its rating prompt. */
+    private fun onLogSaved() {
+        activity?.let { ReviewPrompter.logSaved(it) }
     }
     
     private fun showCustomWaterDialog() {
